@@ -16,8 +16,8 @@ const config: Config = {
         'brand-charcoal': '#333333',
       },
       fontFamily: {
-        sans: ['var(--font-montserrat)'], // Font untuk body
-        serif: ['var(--font-playfair)'],  // Font untuk judul
+        sans: ['var(--font-montserrat)'],
+        serif: ['var(--font-playfair)'],
       },
     },
   },
