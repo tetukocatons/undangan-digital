@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Montserrat, Playfair_Display } from "next/font/google";
-import Navbar from "@/components/Navbar";
+// Hapus: import Navbar from "@/components/Navbar";
 import "./globals.css";
 
 const montserrat = Montserrat({
@@ -28,7 +28,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${montserrat.variable} ${playfair.variable} font-sans bg-brand-champagne text-brand-charcoal`}>
-        <Navbar />
+        {/* Hapus <Navbar /> dari sini */}
         <main>{children}</main>
       </body>
     </html>
