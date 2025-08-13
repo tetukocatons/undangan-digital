@@ -34,7 +34,7 @@ export default function LoginPage() {
       setLoading(false);
     } else {
       setMessage('Login berhasil! Mengarahkan ke dashboard...');
-      router.push(next);
+      router.replace(next);
     }
   };
 

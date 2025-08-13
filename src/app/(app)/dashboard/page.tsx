@@ -4,7 +4,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';import { useRouter } from 'next/navigation'
+import { handleLogout } from '@/lib/logout';
 import Sidebar from '@/components/dashboard/Sidebar';
 import AccountSettings from '@/components/dashboard/AccountSettings';
 

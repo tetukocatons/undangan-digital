@@ -1,36 +1,36 @@
-import type { Metadata } from "next";
-import { Montserrat, Playfair_Display } from "next/font/google";
-// Hapus: import Navbar from "@/components/Navbar";
-import "./globals.css";
+// src/app/layout.tsx
+import type { Metadata } from 'next'
+import './globals.css'
+import { Montserrat, Playfair_Display } from 'next/font/google'
+import { AuthProvider } from '@/contexts/AuthContext'
 
+// ⬇️ DEFINISIKAN VARIABEL FONT YANG DIPAKAI DI className
 const montserrat = Montserrat({
-  subsets: ["latin"],
-  weight: ["400", "500", "700"],
-  variable: "--font-montserrat",
-});
+  subsets: ['latin'],
+  variable: '--font-montserrat',
+  display: 'swap',
+})
 
 const playfair = Playfair_Display({
-  subsets: ["latin"],
-  weight: ["700", "800"],
-  variable: "--font-playfair",
-});
+  subsets: ['latin'],
+  variable: '--font-playfair',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
-  title: "Arumaja - Undangan Digital Elegan",
-  description: "Solusi undangan pernikahan digital dengan sentuhan kemewahan klasik.",
-};
+  title: 'Arumaja',
+}
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${montserrat.variable} ${playfair.variable} font-sans bg-brand-champagne text-brand-charcoal`}>
-        {/* Hapus <Navbar /> dari sini */}
-        <main>{children}</main>
+      <body
+        className={`${montserrat.variable} ${playfair.variable} font-sans bg-brand-champagne text-brand-charcoal`}
+      >
+        <AuthProvider>
+          <main>{children}</main>
+        </AuthProvider>
       </body>
     </html>
-  );
+  )
 }
