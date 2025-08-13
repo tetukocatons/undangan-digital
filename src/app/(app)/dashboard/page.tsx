@@ -1,68 +1,56 @@
 // src/app/(app)/dashboard/page.tsx
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
-
-// Impor komponen-komponen
-import Sidebar, { adminMenu, customerMenu } from '@/components/dashboard/Sidebar';
-import HeaderBar from '@/components/dashboard/HeaderBar';
-import CustomerEventManager from '@/components/dashboard/CustomerEventManager';
-import AccountSettings from '@/components/dashboard/AccountSettings'; // <-- Impor komponen baru
+import Sidebar from '@/components/dashboard/Sidebar';
+import AccountSettings from '@/components/dashboard/AccountSettings';
 
 export default function DashboardPage() {
-  const { user, profile, isLoading } = useAuth(); 
-  const [activeView, setActiveView] = useState('events');
+  const { user, profile, isLoading } = useAuth();
+  const [activeView, setActiveView] = useState<string>('dashboard');
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const router = useRouter();
 
-  const userRole = profile?.role || 'customer'; 
-  const menuItems = userRole === 'admin' ? adminMenu : customerMenu;
+const handleLogout = async () => {
+  // 1) sign out di client
+  await supabase.auth.signOut();
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/login');
-  };
-  
-  const renderContent = () => {
-    if (userRole === 'admin') {
-      return <div>Admin Content Placeholder for {activeView}</div>;
-    } else { // customer
-      switch (activeView) {
-        case 'events': return <CustomerEventManager />;
-        case 'themes': return <div><h2 className="font-serif text-xl font-bold">Pilih Tema</h2></div>;
-        case 'settings': return <AccountSettings />; // <-- Ganti placeholder dengan komponen baru
-        default: return <CustomerEventManager />;
-      }
-    }
-  };
-  
-  const pageTitle = menuItems.find(item => item.id === activeView)?.name || "Dashboard";
-
-  if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center bg-brand-champagne"><p>Loading...</p></div>;
+  // 2) sinkronkan ke server agar cookie sb-… dihapus
+  try {
+    await fetch('/auth/callback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event: 'SIGNED_OUT', session: null }),
+    });
+  } catch (e) {
+    // abaikan error network kecil; logout masih sah di client
   }
 
+  // 3) arahkan ke login, dan cegah kembali ke dashboard via back
+  router.replace('/login');
+};
+
+  const renderContent = () => {
+    if (activeView === 'account') return <AccountSettings />;
+    return (
+      <div className="p-6">
+        <h1 className="font-serif text-3xl font-bold text-brand-green">Dashboard</h1>
+        <p className="mt-2 text-brand-charcoal/80">Selamat datang, {user?.email}.</p>
+      </div>
+    );
+  };
+
+  if (isLoading) return <div className="min-h-screen flex items-center justify-center">Memuat...</div>;
+
   return (
-    <div className="bg-brand-champagne text-brand-charcoal font-sans">
-        <div className="flex min-h-screen">
-            <Sidebar 
-                menuItems={menuItems} 
-                activeView={activeView} 
-                setActiveView={setActiveView}
-                isSidebarOpen={isSidebarOpen}
-                onLogout={handleLogout}
-            />
-            <div className="flex-1 flex flex-col">
-                <HeaderBar title={pageTitle} onMenuClick={() => setSidebarOpen(!isSidebarOpen)} user={user} />
-                <main className="flex-1 p-6 lg:p-8">
-                    {renderContent()}
-                </main>
-            </div>
-        </div>
-        {isSidebarOpen && <div onClick={() => setSidebarOpen(false)} className="fixed inset-0 bg-black/50 z-20 md:hidden"></div>}
+    <div className="min-h-screen bg-brand-champagne">
+      <div className="flex">
+        <Sidebar activeView={activeView} setActiveView={setActiveView} onLogout={handleLogout} />
+        <main className="flex-1">{renderContent()}</main>
+      </div>
     </div>
   );
 }

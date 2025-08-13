@@ -1,66 +1,74 @@
 // src/contexts/AuthContext.tsx
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { User, Session } from '@supabase/supabase-js';
+import type { User, Session } from '@supabase/supabase-js';
 
-// Tipe untuk nilai yang akan disediakan oleh Context
+type Profile = { id: string; email: string | null; role: 'admin' | 'customer' | string };
+
 type AuthContextType = {
   user: User | null;
   session: Session | null;
+  profile: Profile | null;
   isLoading: boolean;
 };
 
-// Buat Context dengan nilai default
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Buat komponen Provider
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  async function fetchProfile(u: User | null) {
+    if (!u) { setProfile(null); return; }
+    const { data } = await supabase.from('profiles').select('*').eq('id', u.id).single();
+    setProfile((data as Profile) || null);
+  }
+
   useEffect(() => {
-    // Fungsi untuk mendapatkan sesi saat komponen pertama kali dimuat
-    const getInitialSession = async () => {
+    let mounted = true;
+
+    (async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
+      if (!mounted) return;
+
+      setSession(session ?? null);
       setUser(session?.user ?? null);
+      await fetchProfile(session?.user ?? null);
       setIsLoading(false);
-    };
+    })();
 
-    getInitialSession();
+    const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setSession(session ?? null);
+      setUser(session?.user ?? null);
+      await fetchProfile(session?.user ?? null);
 
-    // Listener untuk memantau perubahan status otentikasi (login/logout)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setIsLoading(false);
-      }
-    );
+      // Sinkronkan cookie untuk middleware via route handler server
+      await fetch('/auth/callback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event, session }),
+      });
+    });
 
-    // Cleanup listener saat komponen di-unmount
     return () => {
-      subscription?.unsubscribe();
+      mounted = false;
+      sub.subscription.unsubscribe();
     };
   }, []);
 
-  const value = {
-    user,
-    session,
-    isLoading,
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ user, session, profile, isLoading }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
-// Buat custom hook untuk menggunakan AuthContext dengan mudah
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within an AuthProvider');
+  return ctx;
 }

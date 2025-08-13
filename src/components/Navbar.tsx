@@ -10,7 +10,7 @@ export default function Navbar() {
         <nav className="hidden md:flex items-center space-x-6">
           <Link href="#" className="text-brand-off-white/80 hover:text-brand-gold">Produk+</Link>
           <Link href="#" className="text-brand-off-white/80 hover:text-brand-gold">Portfolio</Link>
-          <Link href="/templates" className="text-brand-off-white/80 hover:text-brand-gold">Template</Link>
+          <Link href="/" className="text-brand-off-white/80 hover:text-brand-gold">Template</Link>
           <Link href="#" className="text-brand-off-white/80 hover:text-brand-gold">Blog</Link>
         </nav>
         <div className="hidden md:flex items-center space-x-4">

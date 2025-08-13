@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 
 export default function LoginPage() {
@@ -13,8 +13,9 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  
   const router = useRouter();
+  const search = useSearchParams();
+  const next = search.get('next') || '/dashboard';
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,106 +23,66 @@ export default function LoginPage() {
     setMessage('');
     setError('');
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: email,
-      password: password,
-    });
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
 
     if (signInError) {
-      // Berikan pesan error yang lebih spesifik
       if (signInError.message.includes('Invalid login credentials')) {
-        setError('Email atau password yang Anda masukkan salah.');
+        setError('Email atau password salah.');
       } else {
         setError(signInError.message);
       }
-      setLoading(false); // <-- PENTING: Matikan loading state saat error
+      setLoading(false);
     } else {
       setMessage('Login berhasil! Mengarahkan ke dashboard...');
-      // Arahkan ke dashboard. Middleware akan menangani sisanya.
-      router.push('/dashboard');
-      // Tidak perlu set loading ke false di sini karena akan pindah halaman
+      router.push(next);
     }
   };
 
   return (
     <div className="bg-brand-champagne min-h-screen flex items-center justify-center p-4">
-      
-      <div className="w-full max-w-md space-y-4">
-
-        <div className="text-center">
-            <h1 className="font-serif text-4xl font-bold text-brand-green">
-              Arumaja<span className="text-brand-gold">.</span>
-            </h1>
+      <div className="bg-white w-full max-w-md rounded-xl shadow-lg p-6">
+        <div className="text-center mb-6">
+          <h1 className="font-serif text-4xl font-bold text-brand-green">
+            Arumaja<span className="text-brand-gold">.</span>
+          </h1>
+          <h2 className="font-serif text-2xl font-bold text-brand-charcoal mt-2">Welcome Back</h2>
+          <p className="font-sans text-brand-charcoal/80">Masuk untuk melanjutkan dan mengatur undangan Anda.</p>
         </div>
 
-        <div className="text-center">
-          <h2 className="font-serif text-3xl font-bold text-brand-charcoal">
-            Welcome Back
-          </h2>
-          <p className="font-sans text-brand-charcoal/80 mt-1">
-            Masuk untuk melanjutkan dan mengatur undangan Anda.
-          </p>
-        </div>
-
-        <form onSubmit={handleLogin} className="space-y-5 bg-white p-8 rounded-xl shadow-lg border border-brand-gold/20">
+        <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-brand-charcoal mb-1 font-sans">E-Mail</label>
-            <input 
-              type="email" 
-              id="email" 
-              placeholder="nama@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full p-3 bg-brand-champagne border border-brand-gold rounded-md text-brand-charcoal focus:ring-brand-green focus:border-brand-green transition-all duration-300"
+            <label htmlFor="email" className="block text-sm font-medium text-brand-charcoal mb-1">Email</label>
+            <input
+              id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required
+              className="w-full p-3 bg-brand-champagne border border-brand-gold rounded-md" placeholder="kamu@mail.com"
             />
           </div>
-
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-brand-charcoal mb-1 font-sans">Password</label>
+            <label htmlFor="password" className="block text-sm font-medium text-brand-charcoal mb-1">Password</label>
             <div className="relative">
-              <input 
-                type={showPassword ? 'text' : 'password'}
-                id="password" 
-                placeholder="Minimal 8 Karakter"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={8}
-                className="w-full p-3 pr-10 bg-brand-champagne border border-brand-gold rounded-md text-brand-charcoal focus:ring-brand-green focus:border-brand-green transition-all duration-300"
+              <input
+                id="password" type={showPassword ? 'text' : 'password'} value={password}
+                onChange={(e) => setPassword(e.target.value)} required
+                className="w-full p-3 bg-brand-champagne border border-brand-gold rounded-md pr-12" placeholder="••••••••"
               />
-              <button 
-                type="button" 
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 flex items-center pr-3 text-brand-charcoal/60 hover:text-brand-green"
-                aria-label={showPassword ? "Hide password" : "Show password"}
-              >
-                {/* SVG Icon (Omitted for brevity) */}
+              <button type="button" onClick={() => setShowPassword(s => !s)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-brand-green/80 hover:text-brand-green">
+                {showPassword ? 'Sembunyikan' : 'Tampilkan'}
               </button>
             </div>
           </div>
 
-          {/* Perbarui cara menampilkan error dan message */}
-          {message && !error && <p className="text-center text-sm font-medium text-brand-green">{message}</p>}
-          {error && <p className="text-center text-sm font-medium text-red-600">{error}</p>}
+          {error && <p className="text-red-600 text-sm">{error}</p>}
+          {message && <p className="text-green-700 text-sm">{message}</p>}
 
-          <div className="pt-2">
-            <button 
-              type="submit"
-              disabled={loading}
-              className="w-full flex justify-center items-center gap-2 py-3 font-bold bg-brand-green text-brand-off-white rounded-md hover:opacity-90 transition-all duration-300 disabled:bg-gray-400"
-            >
-              {loading ? 'Memeriksa...' : 'Masuk'}
-              {!loading && <span>&rarr;</span>}
-            </button>
-          </div>
+          <button type="submit" disabled={loading}
+            className="w-full bg-brand-gold text-brand-green font-semibold py-3 rounded-lg hover:opacity-90 disabled:opacity-60">
+            {loading ? 'Masuk...' : 'Masuk'}
+          </button>
         </form>
-        
-        <p className="text-center text-sm text-brand-charcoal/80 pt-4">
-            Belum punya akun?{' '}
-            <Link href="/register" className="font-semibold text-brand-gold hover:underline transition-all duration-300">
-                Daftar disini
-            </Link>
+
+        <p className="text-sm text-center mt-4">
+          Belum punya akun? <Link href="/register" className="text-brand-green underline">Daftar</Link>
         </p>
       </div>
     </div>
