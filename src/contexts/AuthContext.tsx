@@ -77,7 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           });
         } catch {}
         
-        // INI PERBAIKANNYA:
+        // PERBAIKAN:
         // Hanya lakukan refresh jika event BUKAN SIGNED_OUT
         // untuk mencegah konflik dengan fungsi handleLogout.
         if (event !== 'SIGNED_OUT') {

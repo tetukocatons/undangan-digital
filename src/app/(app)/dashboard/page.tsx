@@ -10,13 +10,13 @@ import AccountSettings from '@/components/dashboard/AccountSettings';
 import InvitationsView from '@/components/dashboard/InvitationsView';
 import InvitationForm from '@/components/dashboard/InvitationForm';
 
-// Komponen placeholder untuk halaman admin
+// Komponen placeholder untuk halaman admin (jika ada)
 const UserManagement = () => <div className="p-6"><h1 className="font-serif text-3xl font-bold text-brand-green">Manajemen User</h1><p>Halaman ini hanya untuk Administrator.</p></div>;
 const ThemeManagement = () => <div className="p-6"><h1 className="font-serif text-3xl font-bold text-brand-green">Manajemen Tema</h1><p>Halaman ini untuk Admin dan Staff.</p></div>;
 
 export default function DashboardPage() {
   const { user, profile, isLoading } = useAuth();
-  // Atur 'invitations' sebagai tampilan default saat halaman dimuat
+  // State ini bertindak sebagai "pengontrol" untuk menampilkan view yang benar
   const [activeView, setActiveView] = useState<string>('invitations');
   const router = useRouter();
 
@@ -24,38 +24,36 @@ export default function DashboardPage() {
     handleLogout(router);
   };
 
-  // Fungsi untuk merender komponen utama berdasarkan state 'activeView'
+  // Fungsi ini memilih komponen mana yang akan ditampilkan berdasarkan state 'activeView'
   const renderContent = () => {
     switch (activeView) {
       case 'account':
         return <AccountSettings />;
       
       case 'create-invitation':
-        // Saat 'create-invitation', tampilkan form dan berikan kemampuan untuk kembali
+        // Menampilkan form saat 'activeView' adalah 'create-invitation'
+        // dan memberikan fungsi untuk kembali ke 'invitations'
         return <InvitationForm setActiveView={setActiveView} />;
       
       case 'invitations':
-        // Saat 'invitations', tampilkan daftar undangan dan berikan kemampuan untuk beralih view
+        // Tampilan default: menampilkan daftar undangan
         return <InvitationsView setActiveView={setActiveView} />;
       
-      // Tampilan khusus untuk Admin & Staff
+      // Tampilan khusus untuk Admin & Staff (jika diperlukan)
       case 'user-management':
         if (profile?.role === 'administrator') return <UserManagement />;
-        // Jika bukan admin, kembali ke dashboard utama untuk mencegah akses tidak sah
         return <DefaultDashboardView />;
       
       case 'theme-management':
         if (profile?.role === 'administrator' || profile?.role === 'staff') return <ThemeManagement />;
-        // Jika bukan admin/staff, kembali ke dashboard utama
         return <DefaultDashboardView />;
 
-      // Tampilan default ('dashboard')
       default:
         return <DefaultDashboardView />;
     }
   };
 
-  // Komponen kecil untuk tampilan dashboard default agar lebih rapi
+  // Komponen kecil untuk tampilan dashboard default
   const DefaultDashboardView = () => (
     <div className="p-6">
       <h1 className="font-serif text-3xl font-bold text-brand-green">Dashboard</h1>

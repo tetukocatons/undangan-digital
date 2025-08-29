@@ -1,155 +1,357 @@
-// src/components/dashboard/InvitationsView.tsx
+// src/components/dashboard/InvitationForm.tsx
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
-import DeleteConfirmationModal from './DeleteConfirmationModal';
-import Link from 'next/link';
 
-// ... (definisi tipe Invitation, Icon, dan icons tetap sama) ...
-type Invitation = {
-  id: string;
-  event_name: string;
-  event_date: string;
-  status: string;
-  slug: string;
-};
-const Icon = ({ path, className = "h-5 w-5" }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d={path} />
-  </svg>
-);
-const icons = {
-    add: <Icon path="M12 4v16m8-8H4" />,
-    edit: <Icon path="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.732 3.732z" />,
-    delete: <Icon path="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />,
-    view: <Icon path="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />,
+// Tipe untuk props utama dan data form
+type InvitationFormProps = {
+    setActiveView?: (view: string) => void;
+    invitationId?: string;
 };
 
-export default function InvitationsView({ setActiveView }: { setActiveView: (view: string) => void }) {
-    const [invitations, setInvitations] = useState<Invitation[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const router = useRouter();
-    
-    // ... (state modal dan fungsi-fungsi lainnya tetap sama) ...
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [eventToDelete, setEventToDelete] = useState<Invitation | null>(null);
-    const [deleteLoading, setDeleteLoading] = useState(false);
-    
-    const fetchInvitations = useCallback(async () => {
-        setIsLoading(true);
-        const { data, error } = await supabase
-            .from('events')
-            .select('*')
-            .order('created_at', { ascending: false });
+type FormData = {
+    bride_name: string;
+    groom_name: string;
+    event_name: string;
+    slug: string;
+    event_date: string;
+    location: string;
+    couple_enabled: boolean;
+    quotes_enabled: boolean;
+    gallery_enabled: boolean;
+    acara_enabled: boolean;
+    selected_package: string;
+};
 
-        if (error) {
-            console.error('Error fetching invitations:', error);
-        } else {
-            setInvitations(data as Invitation[]);
-        }
-        setIsLoading(false);
-    }, []);
-
-    useEffect(() => {
-        fetchInvitations();
-    }, [fetchInvitations]);
-
-    const handleEditClick = (invitationId: string) => {
-        router.push(`/dashboard/invitation/${invitationId}/edit`);
-    };
-    const handleDeleteClick = (invitation: Invitation) => {
-        setEventToDelete(invitation);
-        setIsDeleteModalOpen(true);
-    };
-    const handleConfirmDelete = async () => {
-        if (!eventToDelete) return;
-        setDeleteLoading(true);
-        const { error } = await supabase.from('events').delete().eq('id', eventToDelete.id);
-        if (error) {
-            console.error('Error deleting event:', error);
-            alert('Gagal menghapus acara.');
-        } else {
-            fetchInvitations();
-        }
-        setIsDeleteModalOpen(false);
-        setEventToDelete(null);
-        setDeleteLoading(false);
-    };
-
+// Komponen untuk menampilkan progress bar/stepper
+const Stepper = ({ currentStep, steps }: { currentStep: number, steps: string[] }) => {
     return (
-        <div className="space-y-6">
-            <DeleteConfirmationModal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} onConfirm={handleConfirmDelete} eventName={eventToDelete?.event_name || ''} loading={deleteLoading} />
-
-            <div className="flex justify-between items-center">
-                <h1 className="font-serif text-3xl font-bold text-brand-green">Undangan Anda</h1>
-                {/* PERBAIKAN LOGIKA 1: Tombol ini hanya muncul jika belum ada undangan */}
-                {invitations.length === 0 && !isLoading && (
-                    <button 
-                        onClick={() => setActiveView('create-invitation')}
-                        className="bg-brand-green text-brand-off-white font-bold py-2 px-4 rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2"
-                    >
-                        {icons.add}
-                        <span>Buat Undangan Baru</span>
-                    </button>
-                )}
-            </div>
-
-            <div className="bg-white p-6 rounded-lg border border-brand-gold/30 shadow-sm">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                        <thead>
-                            <tr className="border-b-2 border-brand-champagne">
-                                <th className="p-3 text-sm font-semibold uppercase text-brand-charcoal/60">Nama Acara</th>
-                                <th className="p-3 text-sm font-semibold uppercase text-brand-charcoal/60">Tanggal</th>
-                                <th className="p-3 text-sm font-semibold uppercase text-brand-charcoal/60">Status</th>
-                                <th className="p-3 text-sm font-semibold uppercase text-brand-charcoal/60 text-center">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {isLoading ? (
-                                <tr>
-                                    <td colSpan={4} className="text-center p-6">Memuat data...</td>
-                                </tr>
-                            ) : invitations.length > 0 ? (
-                                // ... (kode untuk menampilkan data undangan tetap sama)
-                                invitations.map(inv => (
-                                    <tr key={inv.id} className="border-b border-brand-champagne hover:bg-brand-champagne/50">
-                                        <td className="p-3 font-semibold">{inv.event_name}</td>
-                                        <td className="p-3">{new Date(inv.event_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</td>
-                                        <td className="p-3">
-                                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${inv.status === 'published' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                                                {inv.status}
-                                            </span>
-                                        </td>
-                                        <td className="p-3">
-                                            <div className="flex justify-center items-center gap-3">
-                                                <Link href={`/undangan/${inv.slug}`} target="_blank" className="text-brand-gold hover:opacity-80" title="Lihat Undangan">{icons.view}</Link>
-                                                <button onClick={() => handleEditClick(inv.id)} className="text-brand-green hover:opacity-80" title="Kelola">{icons.edit}</button>
-                                                <button onClick={() => handleDeleteClick(inv)} className="text-red-600 hover:opacity-80" title="Hapus">{icons.delete}</button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
-                            ) : (
-                                <tr>
-                                    <td colSpan={4} className="text-center p-12">
-                                        <p className="text-brand-charcoal/70">Belum ada undangan yang dibuat.</p>
-                                        {/* PERBAIKAN TAMPILAN 2: Mengubah teks menjadi tombol yang jelas */}
-                                        <button 
-                                            onClick={() => setActiveView('create-invitation')} 
-                                            className="mt-4 bg-brand-gold text-brand-green font-semibold py-2 px-4 rounded-lg hover:opacity-90"
-                                        >
-                                            Buat Undangan Pertama Anda!
-                                        </button>
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+        <div className="flex items-center justify-between mb-8">
+            {steps.map((label, index) => {
+                const stepNumber = index + 1;
+                const isActive = stepNumber <= currentStep;
+                return (
+                    <React.Fragment key={stepNumber}>
+                        <div className="flex flex-col items-center text-center">
+                            <div
+                                className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-colors duration-300 ${
+                                    isActive ? 'bg-brand-green border-brand-green text-white' : 'border-gray-300 bg-brand-champagne text-brand-charcoal'
+                                }`}
+                            >
+                                {stepNumber}
+                            </div>
+                            <p className={`mt-2 text-sm transition-colors duration-300 ${isActive ? 'text-brand-green font-semibold' : 'text-gray-500'}`}>{label}</p>
+                        </div>
+                        {stepNumber < steps.length && <div className="flex-1 h-0.5 bg-brand-champagne mx-4"></div>}
+                    </React.Fragment>
+                );
+            })}
         </div>
     );
 };
+
+
+export default function InvitationForm({ setActiveView, invitationId }: InvitationFormProps) {
+    const [step, setStep] = useState(1);
+    const [formData, setFormData] = useState<FormData>({
+        bride_name: '', groom_name: '', event_name: '', slug: '', event_date: '', location: '',
+        couple_enabled: true, quotes_enabled: true, gallery_enabled: false, acara_enabled: true,
+        selected_package: 'silver',
+    });
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const router = useRouter();
+    
+    const isEditMode = !!invitationId;
+    const formSteps = isEditMode ? ["Detail Undangan", "Lokasi & Fitur"] : ["Mulai", "Detail Pernikahan", "Paket", "Pembayaran"];
+
+    useEffect(() => {
+        if (isEditMode) {
+            const fetchInvitationData = async () => {
+                setLoading(true);
+                const { data, error } = await supabase.from('events').select('*').eq('id', invitationId).single();
+
+                if (error) {
+                    setError('Gagal memuat data undangan.');
+                } else if (data) {
+                    const slugPart = data.slug ? data.slug.split('.')[0] : '';
+                    const eventDate = data.event_date ? new Date(data.event_date).toISOString().split('T')[0] : '';
+                    setFormData({
+                        bride_name: data.bride_name || '',
+                        groom_name: data.groom_name || '',
+                        event_name: data.event_name || '',
+                        slug: slugPart,
+                        event_date: eventDate,
+                        location: data.location || '',
+                        couple_enabled: data.couple_enabled ?? true,
+                        quotes_enabled: data.quotes_enabled ?? true,
+                        gallery_enabled: data.gallery_enabled ?? false,
+                        acara_enabled: data.acara_enabled ?? true,
+                        selected_package: data.package || 'silver', 
+                    });
+                }
+                setLoading(false);
+            };
+            fetchInvitationData();
+        }
+    }, [invitationId, isEditMode]);
+
+    const handleNext = () => setStep(prev => prev + 1);
+    const handleBack = () => setStep(prev => prev - 1);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value, type, checked } = e.target;
+        const finalValue = type === 'checkbox' ? checked : value;
+        
+        let processedValue = finalValue;
+        if (name === 'slug') {
+            processedValue = String(finalValue).toLowerCase().replace(/[^a-z0-9-]/g, '');
+        }
+        setFormData(prev => ({ ...prev, [name]: processedValue }));
+    };
+    
+    const handlePackageSelect = (packageName: string) => {
+        setFormData(prev => ({ ...prev, selected_package: packageName }));
+    };
+
+    const handleSubmit = async () => {
+        setLoading(true);
+        setError('');
+
+        const eventData = {
+            bride_name: formData.bride_name,
+            groom_name: formData.groom_name,
+            event_name: formData.event_name,
+            slug: `${formData.slug}.arumaja.id`,
+            event_date: formData.event_date,
+            location: formData.location,
+            couple_enabled: formData.couple_enabled,
+            quotes_enabled: formData.quotes_enabled,
+            gallery_enabled: formData.gallery_enabled,
+            acara_enabled: formData.acara_enabled,
+            package: formData.selected_package,
+        };
+
+        if (isEditMode) {
+            // Saat edit, paket tidak diubah. Hapus dari data update.
+            const { package: _, ...updateData } = eventData;
+            const { error: updateError } = await supabase.from('events').update(updateData).eq('id', invitationId);
+
+            if (updateError) {
+                setError(`Gagal memperbarui: ${updateError.message}`);
+            } else {
+                alert('Undangan berhasil diperbarui!');
+                router.push('/dashboard');
+            }
+        } else {
+            // Panggil RPC dengan semua parameter, termasuk paket
+            const { data, error: rpcError } = await supabase.rpc('create_new_event', {
+                bride_name_in: eventData.bride_name,
+                groom_name_in: eventData.groom_name,
+                event_name_in: eventData.event_name,
+                slug_in: eventData.slug,
+                event_date_in: eventData.event_date,
+                location_in: eventData.location,
+                couple_enabled_in: eventData.couple_enabled,
+                quotes_enabled_in: eventData.quotes_enabled,
+                gallery_enabled_in: eventData.gallery_enabled,
+                acara_enabled_in: eventData.acara_enabled,
+                package_in: eventData.package,
+            });
+
+            if (rpcError) {
+                setError(`Server Error: ${rpcError.message}`);
+            } else if (data?.[0]?.status_code === 200) {
+                alert('Undangan berhasil dibuat!');
+                setActiveView?.('invitations');
+            } else {
+                setError(`Gagal: ${data?.[0]?.message || 'Terjadi kesalahan tidak diketahui.'}`);
+            }
+        }
+        setLoading(false);
+    };
+
+    const handleCancel = () => isEditMode ? router.push('/dashboard') : setActiveView?.('invitations');
+
+    if (loading && isEditMode) return <div className="text-center p-8">Memuat data undangan...</div>;
+
+    return (
+        <div className="bg-white p-8 rounded-lg border border-brand-gold/30 shadow-sm max-w-3xl mx-auto">
+            <Stepper currentStep={step} steps={formSteps} />
+            <div className="mt-8">
+                {isEditMode ? (
+                    <>
+                        {step === 1 && <Step1Mulai formData={formData} handleChange={handleChange} onNext={handleNext} onCancel={handleCancel} isEditMode />}
+                        {step === 2 && <Step2EditDetail formData={formData} handleChange={handleChange} onBack={handleBack} onSubmit={handleSubmit} loading={loading} error={error} />}
+                    </>
+                ) : (
+                    <>
+                        {step === 1 && <Step1Mulai formData={formData} handleChange={handleChange} onNext={handleNext} onCancel={handleCancel} />}
+                        {step === 2 && <Step2EditDetail formData={formData} handleChange={handleChange} onBack={handleBack} onNext={handleNext} isCreateMode />}
+                        {step === 3 && <Step3Paket selectedPackage={formData.selected_package} onSelect={handlePackageSelect} onBack={handleBack} onNext={handleNext} />}
+                        {step === 4 && <Step4Pembayaran selectedPackage={formData.selected_package} onBack={handleBack} onSubmit={handleSubmit} loading={loading} error={error} />}
+                    </>
+                )}
+            </div>
+        </div>
+    );
+}
+
+// ==================================================================
+// KOMPONEN UNTUK SETIAP LANGKAH
+// ==================================================================
+const ToggleSwitch = ({ name, checked, onChange, label, description }: { name: string, checked: boolean, onChange: any, label: string, description: string }) => (
+    <label htmlFor={name} className="flex items-center justify-between cursor-pointer p-4 rounded-lg hover:bg-brand-champagne/50">
+        <div>
+            <p className="font-semibold text-brand-charcoal">{label}</p>
+            <p className="text-sm text-brand-charcoal/70">{description}</p>
+        </div>
+        <div className="relative">
+            <input type="checkbox" id={name} name={name} checked={checked} onChange={onChange} className="sr-only" />
+            <div className={`block w-14 h-8 rounded-full transition ${checked ? 'bg-brand-green' : 'bg-gray-200'}`}></div>
+            <div className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform ${checked ? 'transform translate-x-6' : ''}`}></div>
+        </div>
+    </label>
+);
+
+function Step1Mulai({ formData, handleChange, onNext, onCancel, isEditMode = false }: { formData: Partial<FormData>, handleChange: any, onNext: () => void, onCancel: () => void, isEditMode?: boolean }) {
+    const canProceed = formData.bride_name && formData.groom_name && formData.event_name && formData.slug && formData.event_date;
+    return (
+        <div>
+            <h2 className="text-3xl font-serif font-bold text-brand-green">{isEditMode ? 'Edit Undangan Anda' : "Let's get started"}</h2>
+            <p className="text-brand-charcoal/80 mt-2">{isEditMode ? 'Ubah detail undangan Anda di bawah ini.' : 'Harap isi formulir untuk melanjutkan pemesanan.'}</p>
+            <div className="mt-8 space-y-6">
+                <fieldset>
+                    <legend className="font-semibold text-lg mb-4 text-brand-charcoal">Informasi Mempelai</legend>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <input type="text" name="bride_name" value={formData.bride_name} onChange={handleChange} placeholder="Nama Mempelai Wanita" className="w-full p-3 border-b-2 border-brand-champagne focus:border-brand-gold outline-none transition-colors" required />
+                        <input type="text" name="groom_name" value={formData.groom_name} onChange={handleChange} placeholder="Nama Mempelai Pria" className="w-full p-3 border-b-2 border-brand-champagne focus:border-brand-gold outline-none transition-colors" required />
+                    </div>
+                </fieldset>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                       <label className="font-semibold text-brand-charcoal">Judul Undangan</label>
+                       <input type="text" name="event_name" value={formData.event_name} onChange={handleChange} className="w-full mt-1 p-3 border-b-2 border-brand-champagne focus:border-brand-gold outline-none transition-colors" required />
+                    </div>
+                     <div>
+                       <label className="font-semibold text-brand-charcoal">URL Undangan Website</label>
+                       <div className="flex items-center mt-1 border-b-2 border-brand-champagne focus-within:border-brand-gold transition-colors">
+                           <input type="text" name="slug" value={formData.slug} onChange={handleChange} className="w-full p-3 outline-none" required />
+                           <span className="text-gray-500 pr-3">.arumaja.id</span>
+                       </div>
+                    </div>
+                </div>
+                <div>
+                   <label className="font-semibold text-brand-charcoal">Kapan acara pernikahan kamu diselenggarakan?</label>
+                   <input type="date" name="event_date" value={formData.event_date} onChange={handleChange} className="w-full p-3 mt-2 bg-brand-champagne border border-brand-gold/50 rounded-lg" required />
+                </div>
+            </div>
+             <div className="flex justify-end gap-4 mt-8">
+                <button type="button" onClick={onCancel} className="px-6 py-2 text-sm font-semibold text-brand-charcoal rounded-md hover:bg-brand-champagne">Batal</button>
+                <button type="button" onClick={onNext} disabled={!canProceed} className="px-8 py-2 font-bold text-white bg-brand-green rounded-md hover:opacity-90 disabled:bg-gray-400">Lanjutkan</button>
+            </div>
+        </div>
+    );
+}
+
+function Step2EditDetail({ formData, handleChange, onBack, onNext, onSubmit, loading, error, isCreateMode = false }: { formData: Partial<FormData>, handleChange: any, onBack: () => void, onNext?: () => void, onSubmit?: () => void, loading?: boolean, error?: string, isCreateMode?: boolean }) {
+    return (
+        <div>
+            <h2 className="text-2xl font-serif font-bold text-brand-green">{isCreateMode ? "Langkah 2: Detail Pernikahan" : "Langkah 2: Lokasi & Fitur"}</h2>
+            <p className="mt-2 text-brand-charcoal/80">{isCreateMode ? "Lengkapi detail acara dan fitur yang ingin ditampilkan." : "Ubah lokasi dan fitur yang aktif pada undangan Anda."}</p>
+            <div className="mt-8 space-y-6">
+                <div>
+                    <label htmlFor="location" className="block font-semibold text-brand-charcoal">Lokasi Acara</label>
+                    <input id="location" name="location" type="text" value={formData.location} onChange={handleChange} className="w-full p-3 mt-2 bg-brand-champagne border border-brand-gold/50 rounded-lg" placeholder="Contoh: Gedung Serbaguna, Jl. Merdeka No. 10" />
+                </div>
+                <div className="space-y-2 pt-4 border-t">
+                    <h3 className="font-semibold text-lg text-brand-charcoal">Fitur Undangan</h3>
+                    <ToggleSwitch name="couple_enabled" checked={!!formData.couple_enabled} onChange={handleChange} label="Informasi Pasangan" description="Tampilkan nama dan detail kedua mempelai." />
+                    <ToggleSwitch name="acara_enabled" checked={!!formData.acara_enabled} onChange={handleChange} label="Detail Acara" description="Tampilkan rundown, waktu, dan lokasi acara." />
+                    <ToggleSwitch name="quotes_enabled" checked={!!formData.quotes_enabled} onChange={handleChange} label="Kutipan / Ayat" description="Tampilkan kutipan cinta atau ayat suci." />
+                    <ToggleSwitch name="gallery_enabled" checked={!!formData.gallery_enabled} onChange={handleChange} label="Galeri Foto" description="Tampilkan galeri foto pre-wedding Anda." />
+                </div>
+            </div>
+            {error && <p className="text-red-600 text-sm mt-4">{error}</p>}
+            <div className="flex justify-end gap-4 mt-8">
+                <button type="button" onClick={onBack} className="px-6 py-2 text-sm font-semibold text-brand-charcoal rounded-md hover:bg-brand-champagne">Kembali</button>
+                {isCreateMode ? (
+                     <button type="button" onClick={onNext} className="px-8 py-2 font-bold text-white bg-brand-green rounded-md hover:opacity-90">Lanjutkan</button>
+                ) : (
+                    <button type="button" onClick={onSubmit} disabled={loading} className="px-8 py-2 font-bold text-brand-green bg-brand-gold rounded-md hover:opacity-90 disabled:bg-gray-400">
+                        {loading ? 'Menyimpan...' : 'Simpan Perubahan'}
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function Step3Paket({ selectedPackage, onSelect, onBack, onNext }: { selectedPackage: string, onSelect: (pkg: string) => void, onBack: () => void, onNext: () => void }) {
+    const packages = [
+        { name: 'bronze', title: 'Bronze', price: 'Gratis', features: ['Desain Standar', 'Hitung Mundur Acara', '1 Admin'] },
+        { name: 'silver', title: 'Silver', price: 'Rp 99.000', features: ['Semua di Bronze', '+ Desain Premium', '+ Galeri Foto', '+ Musik Latar'] },
+        { name: 'gold', title: 'Gold', price: 'Rp 149.000', features: ['Semua di Silver', '+ Custom Domain', '+ Amplop Digital', '+ 5 Admin'] },
+    ];
+    return (
+        <div>
+            <h2 className="text-2xl font-serif font-bold text-brand-green">Langkah 3: Pilih Paket</h2>
+            <p className="mt-2 text-brand-charcoal/80">Pilih paket yang paling sesuai dengan kebutuhan Anda.</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+                {packages.map(pkg => (
+                    <div key={pkg.name} onClick={() => onSelect(pkg.name)}
+                        className={`p-6 border-2 rounded-lg cursor-pointer transition ${selectedPackage === pkg.name ? 'border-brand-gold bg-brand-champagne' : 'border-gray-200 hover:border-brand-gold/50'}`}>
+                        <h3 className="font-serif text-xl font-bold text-brand-green">{pkg.title}</h3>
+                        <p className="text-2xl font-bold my-2 text-brand-charcoal">{pkg.price}</p>
+                        <ul className="space-y-2 text-sm text-brand-charcoal/80">
+                            {pkg.features.map(f => <li key={f}>✓ {f}</li>)}
+                        </ul>
+                    </div>
+                ))}
+            </div>
+            <div className="flex justify-end gap-4 mt-8">
+                <button type="button" onClick={onBack} className="px-6 py-2 text-sm font-semibold text-brand-charcoal rounded-md hover:bg-brand-champagne">Kembali</button>
+                <button type="button" onClick={onNext} className="px-8 py-2 font-bold text-white bg-brand-green rounded-md hover:opacity-90">Lanjutkan</button>
+            </div>
+        </div>
+    );
+}
+
+function Step4Pembayaran({ selectedPackage, onBack, onSubmit, loading, error }: { selectedPackage: string, onBack: () => void, onSubmit: () => void, loading: boolean, error: string }) {
+    const packageDetails: { [key: string]: { title: string, price: string } } = {
+        bronze: { title: 'Bronze', price: 'Rp 0' },
+        silver: { title: 'Silver', price: 'Rp 99.000' },
+        gold: { title: 'Gold', price: 'Rp 149.000' },
+    };
+    const currentPackage = packageDetails[selectedPackage];
+    return (
+        <div>
+            <h2 className="text-2xl font-serif font-bold text-brand-green">Langkah 4: Ringkasan & Pembayaran</h2>
+            <div className="mt-6 border rounded-lg p-6 bg-brand-champagne/50">
+                <h3 className="font-semibold text-lg text-brand-charcoal">Ringkasan Pesanan</h3>
+                <div className="flex justify-between items-center mt-4">
+                    <p>Paket {currentPackage.title}</p>
+                    <p className="font-bold">{currentPackage.price}</p>
+                </div>
+                <div className="border-t my-4"></div>
+                <div className="flex justify-between items-center font-bold text-lg text-brand-charcoal">
+                    <p>Total</p>
+                    <p>{currentPackage.price}</p>
+                </div>
+            </div>
+            <div className="mt-6">
+                <h3 className="font-semibold text-lg text-brand-charcoal">Metode Pembayaran</h3>
+                <p className="text-sm text-brand-charcoal/80 mt-2">Fungsionalitas pembayaran akan diimplementasikan di sini (contoh: Midtrans, dll).</p>
+            </div>
+            {error && <p className="text-red-600 text-sm mt-4">{error}</p>}
+            <div className="flex justify-end gap-4 mt-8">
+                <button type="button" onClick={onBack} className="px-6 py-2 text-sm font-semibold text-brand-charcoal rounded-md hover:bg-brand-champagne">Kembali</button>
+                <button type="button" onClick={onSubmit} disabled={loading} className="px-8 py-2 font-bold text-brand-green bg-brand-gold rounded-md hover:opacity-90 disabled:bg-gray-400">
+                    {loading ? 'Memproses...' : 'Selesaikan & Buat Undangan'}
+                </button>
+            </div>
+        </div>
+    );
+}
