@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 
 export default function RegisterPage() {
+  const [fullName, setFullName] = useState(''); // <-- TAMBAHKAN STATE INI
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
@@ -19,7 +20,17 @@ export default function RegisterPage() {
     e.preventDefault();
     setMessage(''); setError(''); setLoading(true);
 
-    const { data, error: signUpError } = await supabase.auth.signUp({ email, password });
+    // Kirim full_name sebagai metadata
+    const { data, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+        },
+      },
+    });
+
     if (signUpError) {
       setError(signUpError.message);
     } else {
@@ -45,21 +56,27 @@ export default function RegisterPage() {
         </div>
 
         <form onSubmit={handleRegister} className="space-y-4">
+          {/* TAMBAHKAN INPUT UNTUK NAMA LENGKAP */}
+          <div>
+            <label htmlFor="fullName" className="block text-sm font-medium text-brand-charcoal mb-1">Nama Lengkap</label>
+            <input id="fullName" type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} required
+              className="w-full p-3 bg-brand-champagne border border-brand-gold rounded-md" placeholder="Nama Lengkap Anda" />
+          </div>
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-brand-charcoal mb-1">Email</label>
-            <input id="email" type="email" value={email} onChange={(e)=>setEmail(e.target.value)} required
+            <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required
               className="w-full p-3 bg-brand-champagne border border-brand-gold rounded-md" placeholder="kamu@mail.com" />
           </div>
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-brand-charcoal mb-1">Password</label>
-            <input id="password" type="password" value={password} onChange={(e)=>setPassword(e.target.value)} required
+            <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required
               className="w-full p-3 bg-brand-champagne border border-brand-gold rounded-md" placeholder="••••••••" />
           </div>
           <div>
             <label htmlFor="wa" className="block text-sm font-medium text-brand-charcoal mb-1">WhatsApp (opsional)</label>
             <div className="flex">
               <span className="inline-flex items-center px-3 bg-white text-brand-green border border-r-0 border-brand-gold rounded-l-md">+62</span>
-              <input id="wa" type="tel" value={whatsapp} onChange={(e)=>setWhatsapp(e.target.value)}
+              <input id="wa" type="tel" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)}
                 className="w-full p-3 bg-brand-champagne border border-brand-gold rounded-r-md" placeholder="81234xxxx" />
             </div>
           </div>

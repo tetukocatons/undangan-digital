@@ -45,7 +45,7 @@ export default function LoginPage() {
           <h1 className="font-serif text-4xl font-bold text-brand-green">
             Arumaja<span className="text-brand-gold">.</span>
           </h1>
-          <h2 className="font-serif text-2xl font-bold text-brand-charcoal mt-2">Welcome Back</h2>
+          < br />
           <p className="font-sans text-brand-charcoal/80">Masuk untuk melanjutkan dan mengatur undangan Anda.</p>
         </div>
 

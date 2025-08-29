@@ -1,196 +1,155 @@
-// src/components/dashboard/InvitationForm.tsx
+// src/components/dashboard/InvitationsView.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
+import DeleteConfirmationModal from './DeleteConfirmationModal';
 import Link from 'next/link';
 
-// --- Komponen Stepper (bisa dipindahkan jika digunakan di tempat lain) ---
-const Stepper = ({ currentStep }: { currentStep: number }) => {
-    const steps = ["Mulai", "Detail Pernikahan", "Paket", "Pembayaran"];
-    return (
-        <div className="flex items-center w-full mb-12">
-            {steps.map((step, index) => (
-                <React.Fragment key={step}>
-                    <div className="flex flex-col items-center text-center z-10">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold transition-all duration-300 ${
-                            index + 1 === currentStep 
-                                ? 'bg-brand-green text-brand-off-white' 
-                                : 'border-2 border-brand-gold text-brand-gold'
-                        }`}>
-                            {index + 1}
-                        </div>
-                        <p className={`mt-2 text-xs sm:text-sm font-sans font-semibold ${
-                            index + 1 === currentStep ? 'text-brand-green' : 'text-brand-charcoal/70'
-                        }`}>{step}</p>
-                    </div>
-                    {index < steps.length - 1 && (
-                        <div className="flex-1 h-0.5 bg-brand-gold/50 -mx-2"></div>
-                    )}
-                </React.Fragment>
-            ))}
-        </div>
-    );
+// ... (definisi tipe Invitation, Icon, dan icons tetap sama) ...
+type Invitation = {
+  id: string;
+  event_name: string;
+  event_date: string;
+  status: string;
+  slug: string;
+};
+const Icon = ({ path, className = "h-5 w-5" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d={path} />
+  </svg>
+);
+const icons = {
+    add: <Icon path="M12 4v16m8-8H4" />,
+    edit: <Icon path="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.732 3.732z" />,
+    delete: <Icon path="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />,
+    view: <Icon path="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />,
 };
 
-// --- Props untuk Komponen Form ---
-type InvitationFormProps = {
-    invitationId?: string; // Opsional, hanya ada saat mode edit
-};
-
-export default function InvitationForm({ invitationId }: InvitationFormProps) {
-    const [brideName, setBrideName] = useState('');
-    const [groomName, setGroomName] = useState('');
-    const [eventName, setEventName] = useState('');
-    const [slug, setSlug] = useState('');
-    const [eventDate, setEventDate] = useState('');
-
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-    const [isEditMode, setIsEditMode] = useState(false);
+export default function InvitationsView({ setActiveView }: { setActiveView: (view: string) => void }) {
+    const [invitations, setInvitations] = useState<Invitation[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const router = useRouter();
+    
+    // ... (state modal dan fungsi-fungsi lainnya tetap sama) ...
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [eventToDelete, setEventToDelete] = useState<Invitation | null>(null);
+    const [deleteLoading, setDeleteLoading] = useState(false);
+    
+    const fetchInvitations = useCallback(async () => {
+        setIsLoading(true);
+        const { data, error } = await supabase
+            .from('events')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching invitations:', error);
+        } else {
+            setInvitations(data as Invitation[]);
+        }
+        setIsLoading(false);
+    }, []);
 
     useEffect(() => {
-        if (invitationId) {
-            setIsEditMode(true);
-            setLoading(true);
-            const fetchInvitationData = async () => {
-                const { data, error } = await supabase
-                    .from('events')
-                    .select('*')
-                    .eq('id', invitationId)
-                    .single();
-                
-                if (error) {
-                    setError('Gagal memuat data undangan.');
-                    console.error(error);
-                } else if (data) {
-                    setBrideName(data.bride_name);
-                    setGroomName(data.groom_name);
-                    setEventName(data.event_name);
-                    setSlug(data.slug);
-                    setEventDate(data.event_date);
-                }
-                setLoading(false);
-            };
-            fetchInvitationData();
-        }
-    }, [invitationId]);
+        fetchInvitations();
+    }, [fetchInvitations]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setLoading(true);
-        setError('');
-
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-            setError("Sesi tidak valid. Silakan login kembali.");
-            setLoading(false);
-            return;
-        }
-
-        const eventData = {
-            bride_name: brideName,
-            groom_name: groomName,
-            event_name: eventName,
-            slug: slug,
-            event_date: eventDate,
-        };
-
-        if (isEditMode) {
-            // --- LOGIKA UPDATE ---
-            const { error: updateError } = await supabase
-                .from('events')
-                .update(eventData)
-                .eq('id', invitationId);
-
-            if (updateError) {
-                setError('Terjadi kesalahan saat memperbarui: ' + updateError.message);
-            } else {
-                router.push('/dashboard?view=invitations'); // Kembali ke daftar undangan
-            }
+    const handleEditClick = (invitationId: string) => {
+        router.push(`/dashboard/invitation/${invitationId}/edit`);
+    };
+    const handleDeleteClick = (invitation: Invitation) => {
+        setEventToDelete(invitation);
+        setIsDeleteModalOpen(true);
+    };
+    const handleConfirmDelete = async () => {
+        if (!eventToDelete) return;
+        setDeleteLoading(true);
+        const { error } = await supabase.from('events').delete().eq('id', eventToDelete.id);
+        if (error) {
+            console.error('Error deleting event:', error);
+            alert('Gagal menghapus acara.');
         } else {
-            // --- LOGIKA INSERT ---
-            const { data: newEvent, error: insertError } = await supabase
-                .from('events')
-                .insert({ ...eventData, user_id: user.id, status: 'draft' })
-                .select()
-                .single();
-            
-            if (insertError) {
-                if (insertError.code === '23505') { 
-                     setError('URL Undangan ini sudah digunakan. Silakan pilih yang lain.');
-                } else {
-                     setError('Terjadi kesalahan: ' + insertError.message);
-                }
-            } else if (newEvent) {
-                // Arahkan ke halaman edit setelah berhasil dibuat
-                router.push(`/dashboard/invitation/${newEvent.id}/edit`);
-            }
+            fetchInvitations();
         }
-        setLoading(false);
+        setIsDeleteModalOpen(false);
+        setEventToDelete(null);
+        setDeleteLoading(false);
     };
 
     return (
-        <div className="max-w-4xl mx-auto py-8 px-4">
-            <div className="bg-white p-6 sm:p-12 rounded-xl border border-brand-gold/30 shadow-sm">
-                <Stepper currentStep={isEditMode ? 2 : 1} />
+        <div className="space-y-6">
+            <DeleteConfirmationModal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} onConfirm={handleConfirmDelete} eventName={eventToDelete?.event_name || ''} loading={deleteLoading} />
 
-                <div className="mb-8">
-                    <h1 className="font-serif text-4xl sm:text-5xl font-bold text-brand-green">
-                        {isEditMode ? 'Edit Detail Undangan' : "Let's get started"}
-                    </h1>
-                    <p className="font-sans text-brand-charcoal/80 mt-2">
-                        {isEditMode ? 'Perbarui informasi undangan Anda di bawah ini.' : 'Harap isi formulir untuk melanjutkan pemesanan.'}
-                    </p>
+            <div className="flex justify-between items-center">
+                <h1 className="font-serif text-3xl font-bold text-brand-green">Undangan Anda</h1>
+                {/* PERBAIKAN LOGIKA 1: Tombol ini hanya muncul jika belum ada undangan */}
+                {invitations.length === 0 && !isLoading && (
+                    <button 
+                        onClick={() => setActiveView('create-invitation')}
+                        className="bg-brand-green text-brand-off-white font-bold py-2 px-4 rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2"
+                    >
+                        {icons.add}
+                        <span>Buat Undangan Baru</span>
+                    </button>
+                )}
+            </div>
+
+            <div className="bg-white p-6 rounded-lg border border-brand-gold/30 shadow-sm">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead>
+                            <tr className="border-b-2 border-brand-champagne">
+                                <th className="p-3 text-sm font-semibold uppercase text-brand-charcoal/60">Nama Acara</th>
+                                <th className="p-3 text-sm font-semibold uppercase text-brand-charcoal/60">Tanggal</th>
+                                <th className="p-3 text-sm font-semibold uppercase text-brand-charcoal/60">Status</th>
+                                <th className="p-3 text-sm font-semibold uppercase text-brand-charcoal/60 text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {isLoading ? (
+                                <tr>
+                                    <td colSpan={4} className="text-center p-6">Memuat data...</td>
+                                </tr>
+                            ) : invitations.length > 0 ? (
+                                // ... (kode untuk menampilkan data undangan tetap sama)
+                                invitations.map(inv => (
+                                    <tr key={inv.id} className="border-b border-brand-champagne hover:bg-brand-champagne/50">
+                                        <td className="p-3 font-semibold">{inv.event_name}</td>
+                                        <td className="p-3">{new Date(inv.event_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</td>
+                                        <td className="p-3">
+                                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${inv.status === 'published' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                                                {inv.status}
+                                            </span>
+                                        </td>
+                                        <td className="p-3">
+                                            <div className="flex justify-center items-center gap-3">
+                                                <Link href={`/undangan/${inv.slug}`} target="_blank" className="text-brand-gold hover:opacity-80" title="Lihat Undangan">{icons.view}</Link>
+                                                <button onClick={() => handleEditClick(inv.id)} className="text-brand-green hover:opacity-80" title="Kelola">{icons.edit}</button>
+                                                <button onClick={() => handleDeleteClick(inv)} className="text-red-600 hover:opacity-80" title="Hapus">{icons.delete}</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan={4} className="text-center p-12">
+                                        <p className="text-brand-charcoal/70">Belum ada undangan yang dibuat.</p>
+                                        {/* PERBAIKAN TAMPILAN 2: Mengubah teks menjadi tombol yang jelas */}
+                                        <button 
+                                            onClick={() => setActiveView('create-invitation')} 
+                                            className="mt-4 bg-brand-gold text-brand-green font-semibold py-2 px-4 rounded-lg hover:opacity-90"
+                                        >
+                                            Buat Undangan Pertama Anda!
+                                        </button>
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
                 </div>
-
-                <form onSubmit={handleSubmit} className="space-y-8">
-                    <fieldset>
-                        <legend className="font-serif text-xl font-bold text-brand-charcoal mb-4">Informasi Mempelai</legend>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <input type="text" placeholder="Mempelai Wanita" value={brideName} onChange={(e) => setBrideName(e.target.value)} required className="w-full p-3 bg-white border border-brand-gold rounded-md focus:outline-none focus:ring-2 focus:ring-brand-green/50 focus:border-brand-green placeholder:text-gray-400" />
-                            <input type="text" placeholder="Mempelai Pria" value={groomName} onChange={(e) => setGroomName(e.target.value)} required className="w-full p-3 bg-white border border-brand-gold rounded-md focus:outline-none focus:ring-2 focus:ring-brand-green/50 focus:border-brand-green placeholder:text-gray-400" />
-                        </div>
-                    </fieldset>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label htmlFor="eventName" className="block text-sm font-medium text-brand-charcoal mb-1">Judul Undangan</label>
-                            <input id="eventName" type="text" placeholder="BellaTuko" value={eventName} onChange={(e) => setEventName(e.target.value)} required className="w-full p-3 bg-white border border-brand-gold rounded-md focus:outline-none focus:ring-2 focus:ring-brand-green/50 focus:border-brand-green placeholder:text-gray-400" />
-                        </div>
-                        <div>
-                            <label htmlFor="slug" className="block text-sm font-medium text-brand-charcoal mb-1">URL Undangan Website</label>
-                            <div className="flex items-center">
-                                <input type="text" id="slug" placeholder="bellatuko" value={slug} onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))} required className="w-full p-3 bg-white border border-brand-gold rounded-md focus:outline-none focus:ring-2 focus:ring-brand-green/50 focus:border-brand-green placeholder:text-gray-400 text-right" />
-                                <span className="text-brand-charcoal/70 pl-2 font-semibold">.arumaja.id</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <label htmlFor="eventDate" className="block text-sm font-medium text-brand-charcoal mb-1">Kapan acara pernikahan kamu diselenggarakan?</label>
-                        <input id="eventDate" type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} required className="w-full p-3 bg-white border border-brand-gold rounded-lg focus:ring-2 focus:ring-brand-green/50 focus:border-brand-green" />
-                        <p className="text-xs text-gray-500 mt-1">Jangan khawatir, kamu masih bisa mengubah data di Smart Dashboard!</p>
-                    </div>
-
-                    {error && <p className="text-sm text-red-600 text-center">{error}</p>}
-
-                    <div className="flex justify-between items-center pt-6">
-                        <Link href="/dashboard" className="font-bold text-brand-green hover:opacity-80 transition-opacity">
-                            Kembali
-                        </Link>
-                        <button 
-                            type="submit"
-                            disabled={loading}
-                            className="py-3 px-8 font-bold bg-brand-green text-brand-off-white rounded-lg hover:opacity-90 transition-opacity disabled:bg-gray-400"
-                        >
-                            {loading ? 'Menyimpan...' : (isEditMode ? 'Simpan Perubahan' : 'Lanjut')}
-                        </button>
-                    </div>
-                </form>
             </div>
         </div>
     );
-}
+};

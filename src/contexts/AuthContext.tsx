@@ -7,7 +7,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 
 // Definisikan tipe untuk profile, sesuaikan dengan tabel 'profiles' Anda
-type UserProfile = {
+export type UserProfile = {
   id: string;
   full_name: string;
   role: string;
@@ -26,7 +26,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null); // State untuk profile
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
@@ -38,7 +38,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(currentUser);
 
       if (currentUser) {
-        // Ambil profil jika ada user
         const { data: userProfile } = await supabase
           .from('profiles')
           .select('*')
@@ -58,7 +57,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(currentUser);
 
         if (currentUser) {
-          // Ambil profil saat state auth berubah
           const { data: userProfile } = await supabase
             .from('profiles')
             .select('*')
@@ -66,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             .single();
           setProfile(userProfile as UserProfile | null);
         } else {
-          setProfile(null); // Kosongkan profile saat logout
+          setProfile(null);
         }
 
         setIsLoading(false);
@@ -79,7 +77,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           });
         } catch {}
         
-        router.refresh();
+        // INI PERBAIKANNYA:
+        // Hanya lakukan refresh jika event BUKAN SIGNED_OUT
+        // untuk mencegah konflik dengan fungsi handleLogout.
+        if (event !== 'SIGNED_OUT') {
+          router.refresh();
+        }
       }
     );
 
