@@ -1,7 +1,7 @@
 // src/app/(app)/dashboard/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { handleLogout } from '@/lib/logout';
@@ -9,6 +9,7 @@ import Sidebar from '@/components/dashboard/Sidebar';
 import AccountSettings from '@/components/dashboard/AccountSettings';
 import InvitationsView from '@/components/dashboard/InvitationsView';
 import InvitationForm from '@/components/dashboard/InvitationForm';
+import { SupabaseClient } from '@supabase/supabase-js'; // Import SupabaseClient type
 
 // Komponen Ikon Hamburger
 const MenuIcon = ({ className = "w-6 h-6" }) => (
@@ -20,14 +21,52 @@ const MenuIcon = ({ className = "w-6 h-6" }) => (
 const UserManagement = () => <div className="p-6"><h1 className="font-serif text-3xl font-bold text-brand-green">Manajemen User</h1><p>Halaman ini hanya untuk Administrator.</p></div>;
 const ThemeManagement = () => <div className="p-6"><h1 className="font-serif text-3xl font-bold text-brand-green">Manajemen Tema</h1><p>Halaman ini untuk Admin dan Staff.</p></div>;
 
+type Invitation = {
+  id: string;
+  event_name: string;
+  event_date: string;
+  status: string;
+  slug: string;
+  package: string;
+};
+
 export default function DashboardPage() {
-  const { user, profile, isLoading } = useAuth();
+  const { user, profile, isLoading: isAuthLoading, supabase } = useAuth(); // Dapatkan supabase dari context
   const [activeView, setActiveView] = useState<string>('invitations');
-  const [isSidebarOpen, setSidebarOpen] = useState(false); // State untuk sidebar mobile
+  const [isSidebarOpen, setSidebarOpen] = useState(false);
   const router = useRouter();
 
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchInvitations = async () => {
+    setIsLoading(true);
+    const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching invitations:', error);
+        setInvitations([]);
+    } else {
+        setInvitations(data as Invitation[]);
+    }
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    fetchInvitations();
+  }, []);
+
   const onLogout = () => {
-    handleLogout(router);
+    // Teruskan supabase client ke handleLogout
+    handleLogout(router, supabase);
+  };
+
+  const handleInvitationCreated = () => {
+    fetchInvitations();
+    setActiveView('invitations');
   };
 
   const renderContent = () => {
@@ -35,9 +74,14 @@ export default function DashboardPage() {
       case 'account':
         return <AccountSettings />;
       case 'create-invitation':
-        return <InvitationForm setActiveView={setActiveView} />;
+        return <InvitationForm setActiveView={handleInvitationCreated} />;
       case 'invitations':
-        return <InvitationsView setActiveView={setActiveView} />;
+        return <InvitationsView 
+                  invitations={invitations}
+                  isLoading={isLoading}
+                  refreshInvitations={fetchInvitations}
+                  setActiveView={setActiveView} 
+               />;
       case 'user-management':
         if (profile?.role === 'administrator') return <UserManagement />;
         return <DefaultDashboardView />;
@@ -61,7 +105,7 @@ export default function DashboardPage() {
     </div>
   );
 
-  if (isLoading) {
+  if (isAuthLoading) {
     return <div className="min-h-screen flex items-center justify-center">Memuat...</div>;
   }
 
@@ -73,11 +117,10 @@ export default function DashboardPage() {
             setActiveView={setActiveView} 
             onLogout={onLogout} 
             profile={profile}
-            isOpen={isSidebarOpen} // Pass state
-            toggle={() => setSidebarOpen(!isSidebarOpen)} // Pass toggle function
+            isOpen={isSidebarOpen}
+            toggle={() => setSidebarOpen(!isSidebarOpen)}
         />
         <main className="flex-1">
-            {/* Header untuk Mobile dengan tombol Hamburger */}
             <div className="md:hidden bg-brand-green text-white p-4 flex items-center shadow-md">
                 <button onClick={() => setSidebarOpen(true)}>
                     <MenuIcon />

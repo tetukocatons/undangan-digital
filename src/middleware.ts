@@ -1,58 +1,73 @@
 // src/middleware.ts
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 
-export async function middleware(req: NextRequest) {
-  const res = NextResponse.next()
+export async function middleware(request: NextRequest) {
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  })
 
-  // Client Supabase untuk Middleware (pakai cookie adapter Next 13/14/15)
+  // Buat klien Supabase di middleware yang akan membaca dan menulis cookies
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
         get(name: string) {
-          return req.cookies.get(name)?.value
+          return request.cookies.get(name)?.value
         },
         set(name: string, value: string, options: CookieOptions) {
-          res.cookies.set({ name, value, ...options })
+          // Jika cookie sesi diubah, teruskan di header request DAN response
+          request.cookies.set({ name, value, ...options })
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          })
+          response.cookies.set({ name, value, ...options })
         },
         remove(name: string, options: CookieOptions) {
-          res.cookies.set({ name, value: '', ...options, maxAge: 0 })
+          request.cookies.set({ name, value: '', ...options })
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          })
+          response.cookies.set({ name, value: '', ...options })
         },
       },
     }
   )
 
+  // Me-refresh sesi jika sudah kedaluwarsa
   const { data: { user } } = await supabase.auth.getUser()
 
-  const { pathname, search } = req.nextUrl
+  const { pathname } = request.nextUrl
+  const isPrivate = pathname.startsWith('/dashboard')
 
-  const isPrivate =
-    pathname.startsWith('/dashboard') ||
-    pathname.startsWith('/account') ||
-    pathname.startsWith('/i')
-
+  // Logika proteksi rute
   if (isPrivate && !user) {
-    const url = req.nextUrl.clone()
-    url.pathname = '/login'
-    url.search = `?next=${encodeURIComponent(pathname + (search || ''))}`
-    return NextResponse.redirect(url)
+    return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  if (pathname === '/login' && user) {
-    const url = req.nextUrl.clone()
-    url.pathname = '/dashboard'
-    url.search = ''
-    return NextResponse.redirect(url)
+  if (pathname.startsWith('/login') && user) {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
   }
-
-  return res
+  
+  return response
 }
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|images|fonts|api/auth|auth/callback).*)',
+    /*
+     * Cocokkan semua path request kecuali untuk:
+     * - file statis di _next/static
+     * - file gambar di _next/image
+     * - favicon.ico
+     * - file aset di dalam /public (svg, png, jpg, dll.)
+     */
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

@@ -3,10 +3,9 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabaseClient';
 
 export default function AccountSettings() {
-  const { user, profile, isLoading } = useAuth();
+  const { user, profile, isLoading, supabase } = useAuth();
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [message, setMessage] = useState('');
@@ -24,7 +23,6 @@ export default function AccountSettings() {
 
     if (!user) return;
 
-    // Update nama lengkap di tabel profiles
     const { error } = await supabase
       .from('profiles')
       .update({ full_name: fullName })

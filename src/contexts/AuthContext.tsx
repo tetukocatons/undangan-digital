@@ -2,95 +2,83 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase } from '@/lib/supabaseClient';
-import { User, Session } from '@supabase/supabase-js';
+import { User, Session, SupabaseClient } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client'; // <- Ganti import
 
-// Definisikan tipe untuk profile, sesuaikan dengan tabel 'profiles' Anda
 export type UserProfile = {
   id: string;
   full_name: string;
   role: string;
-  // tambahkan properti lain jika ada
 };
 
 type AuthContextType = {
+  supabase: SupabaseClient; // <- Ekspor klien supabase agar bisa digunakan di komponen lain
   user: User | null;
   session: Session | null;
-  profile: UserProfile | null; // Tambahkan profile
+  profile: UserProfile | null;
   isLoading: boolean;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const supabase = createClient(); // Buat klien sisi browser
+  const router = useRouter();
+  
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const router = useRouter();
 
   useEffect(() => {
-    const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session ?? null);
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-
-      if (currentUser) {
+    const getInitialUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUser(user);
         const { data: userProfile } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', currentUser.id)
+          .eq('id', user.id)
           .single();
         setProfile(userProfile as UserProfile | null);
       }
       setIsLoading(false);
     };
 
-    getInitialSession();
+    getInitialUser();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setSession(session ?? null);
-        const currentUser = session?.user ?? null;
-        setUser(currentUser);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      
+      // Saat auth state berubah (login/logout), cukup refresh router.
+      // @supabase/ssr akan menangani sinkronisasi cookie secara otomatis.
+      router.refresh();
 
-        if (currentUser) {
+      // Ambil ulang profil jika user berubah
+      if (event === 'SIGNED_IN' && session?.user) {
+        const fetchProfile = async () => {
           const { data: userProfile } = await supabase
             .from('profiles')
             .select('*')
-            .eq('id', currentUser.id)
+            .eq('id', session.user.id)
             .single();
           setProfile(userProfile as UserProfile | null);
-        } else {
-          setProfile(null);
-        }
-
-        setIsLoading(false);
-
-        try {
-          await fetch('/api/auth/callback', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ event, session }),
-          });
-        } catch {}
-        
-        // PERBAIKAN:
-        // Hanya lakukan refresh jika event BUKAN SIGNED_OUT
-        // untuk mencegah konflik dengan fungsi handleLogout.
-        if (event !== 'SIGNED_OUT') {
-          router.refresh();
-        }
+        };
+        fetchProfile();
+      } else if (event === 'SIGNED_OUT') {
+        setProfile(null);
       }
-    );
+    });
 
-    return () => { subscription?.unsubscribe(); };
-  }, [router]);
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [supabase, router]);
 
   return (
-    <AuthContext.Provider value={{ user, session, profile, isLoading }}>
+    <AuthContext.Provider value={{ supabase, user, session, profile, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

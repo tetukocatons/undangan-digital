@@ -2,7 +2,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { Montserrat, Playfair_Display } from 'next/font/google'
-import { AuthProvider } from '@/contexts/AuthContext'
 
 // ⬇️ DEFINISIKAN VARIABEL FONT YANG DIPAKAI DI className
 const montserrat = Montserrat({
@@ -27,9 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body
         className={`${montserrat.variable} ${playfair.variable} font-sans bg-brand-champagne text-brand-charcoal`}
       >
-        <AuthProvider>
-          <main>{children}</main>
-        </AuthProvider>
+        <main>{children}</main>
       </body>
     </html>
   )

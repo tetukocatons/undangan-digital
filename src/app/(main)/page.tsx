@@ -4,7 +4,6 @@ export default function HomePage() {
     <div className="container mx-auto px-4 py-16 md:py-24">
       <div className="flex flex-col md:flex-row items-center gap-12">
         <div className="md:w-1/2 text-center md:text-left">
-          {/* Ubah ukuran font untuk mobile dan desktop */}
           <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl font-bold text-brand-green leading-tight">
             Solusi Digital
             <br />
@@ -15,7 +14,6 @@ export default function HomePage() {
           <p className="mt-6 text-lg font-sans text-brand-charcoal/80">
             Jadikan pernikahanmu lebih efektif, efisien dan modern dengan Arumaja. Solusi digital pernikahan terlengkap!
           </p>
-          {/* Buat tombol menumpuk di mobile dan berdampingan di desktop */}
           <div className="mt-8 flex flex-col sm:flex-row justify-center md:justify-start gap-4">
             <button className="bg-brand-green text-brand-off-white font-bold py-3 px-6 rounded-lg hover:opacity-90 transition-opacity">
               Pesan Sekarang

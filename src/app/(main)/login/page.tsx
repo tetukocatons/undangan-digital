@@ -4,9 +4,10 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@/lib/supabase/client'; // <-- KEMBALIKAN IMPORT INI
 
 export default function LoginPage() {
+  const supabase = createClient(); // Buat instance client langsung
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -82,7 +83,7 @@ export default function LoginPage() {
         </form>
 
         <p className="text-sm text-center mt-4">
-          Belum punya akun? <Link href="/register" className="text-brand-green underline">Daftar</Link>
+          Sudah punya akun? <Link href="/register" className="text-brand-green underline">Daftar</Link>
         </p>
       </div>
     </div>

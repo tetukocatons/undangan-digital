@@ -3,9 +3,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabaseClient';
+import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
 
-// Tipe untuk props utama dan data form
 type InvitationFormProps = {
     setActiveView?: (view: string) => void;
     invitationId?: string;
@@ -23,9 +23,11 @@ type FormData = {
     gallery_enabled: boolean;
     acara_enabled: boolean;
     selected_package: string;
+    status: string;
 };
 
-// Komponen Stepper yang DITINGKATKAN untuk mobile
+type SlugStatus = 'idle' | 'checking' | 'available' | 'unavailable';
+
 const Stepper = ({ currentStep, steps }: { currentStep: number, steps: string[] }) => {
     return (
         <div className="flex items-center justify-between mb-8 w-full">
@@ -42,7 +44,6 @@ const Stepper = ({ currentStep, steps }: { currentStep: number, steps: string[] 
                             >
                                 {stepNumber}
                             </div>
-                            {/* Teks hanya muncul di layar sm ke atas */}
                             <p className={`mt-2 text-xs sm:text-sm transition-colors duration-300 ${isActive ? 'text-brand-green font-semibold' : 'text-gray-500'}`}>{label}</p>
                         </div>
                         {stepNumber < steps.length && <div className={`flex-1 h-0.5 mx-2 transition-colors duration-300 ${isActive ? 'bg-brand-green' : 'bg-brand-champagne'}`}></div>}
@@ -55,29 +56,76 @@ const Stepper = ({ currentStep, steps }: { currentStep: number, steps: string[] 
 
 
 export default function InvitationForm({ setActiveView, invitationId }: InvitationFormProps) {
+    const { supabase } = useAuth();
     const [step, setStep] = useState(1);
     const [formData, setFormData] = useState<FormData>({
         bride_name: '', groom_name: '', event_name: '', slug: '', event_date: '', location: '',
         couple_enabled: true, quotes_enabled: true, gallery_enabled: false, acara_enabled: true,
         selected_package: 'silver',
+        status: 'draft',
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const router = useRouter();
+
+    const [slugStatus, setSlugStatus] = useState<SlugStatus>('idle');
+    const [slugError, setSlugError] = useState('');
+    const [initialSlug, setInitialSlug] = useState<string | null>(null);
     
     const isEditMode = !!invitationId;
     const formSteps = isEditMode ? ["Detail", "Fitur"] : ["Mulai", "Detail", "Paket", "Bayar"];
 
     useEffect(() => {
-        if (isEditMode) {
+        if (step !== 1) return;
+
+        const handler = setTimeout(async () => {
+            const slug = formData.slug;
+
+            if (isEditMode && slug === initialSlug) {
+                setSlugStatus('available');
+                return;
+            }
+            if (!slug || slug.length < 3) {
+                setSlugStatus('idle');
+                return;
+            }
+
+            setSlugStatus('checking');
+            setSlugError('');
+            
+            try {
+                const finalSlug = `${slug}.arumaja.id`;
+                const { data: exists, error: rpcError } = await supabase.rpc('slug_exists', {
+                    slug_to_check: finalSlug
+                });
+                if (rpcError) throw rpcError;
+                if (exists) {
+                    setSlugStatus('unavailable');
+                    setSlugError('URL ini sudah digunakan. Silakan pilih yang lain.');
+                } else {
+                    setSlugStatus('available');
+                }
+            } catch (err) {
+                console.error("Slug check error:", err);
+                setSlugStatus('idle');
+            }
+        }, 500);
+
+        return () => {
+            clearTimeout(handler);
+        };
+    }, [formData.slug, step, initialSlug, isEditMode, supabase]);
+
+
+    useEffect(() => {
+        if (isEditMode && invitationId) {
             const fetchInvitationData = async () => {
                 setLoading(true);
                 const { data, error } = await supabase.from('events').select('*').eq('id', invitationId).single();
-
                 if (error) {
                     setError('Gagal memuat data undangan.');
                 } else if (data) {
-                    const slugPart = data.slug ? data.slug.split('.')[0] : '';
+                    const slugPart = data.slug ? data.slug.replace('.arumaja.id', '') : '';
                     const eventDate = data.event_date ? new Date(data.event_date).toISOString().split('T')[0] : '';
                     setFormData({
                         bride_name: data.bride_name || '',
@@ -90,14 +138,17 @@ export default function InvitationForm({ setActiveView, invitationId }: Invitati
                         quotes_enabled: data.quotes_enabled ?? true,
                         gallery_enabled: data.gallery_enabled ?? false,
                         acara_enabled: data.acara_enabled ?? true,
-                        selected_package: data.package || 'silver', 
+                        selected_package: data.package || 'silver',
+                        status: data.status || 'draft',
                     });
+                    setInitialSlug(slugPart);
+                    setSlugStatus('available');
                 }
                 setLoading(false);
             };
             fetchInvitationData();
         }
-    }, [invitationId, isEditMode]);
+    }, [invitationId, isEditMode, supabase]);
 
     const handleNext = () => setStep(prev => prev + 1);
     const handleBack = () => setStep(prev => prev - 1);
@@ -109,8 +160,9 @@ export default function InvitationForm({ setActiveView, invitationId }: Invitati
         let processedValue = finalValue;
         if (name === 'slug') {
             processedValue = String(finalValue).toLowerCase().replace(/[^a-z0-9-]/g, '');
+            setSlugStatus('idle');
         }
-        setFormData(prev => ({ ...prev, [name]: processedValue }));
+        setFormData(prev => ({ ...prev, [name]: processedValue as any }));
     };
     
     const handlePackageSelect = (packageName: string) => {
@@ -138,7 +190,6 @@ export default function InvitationForm({ setActiveView, invitationId }: Invitati
         if (isEditMode) {
             const { package: _, ...updateData } = eventData;
             const { error: updateError } = await supabase.from('events').update(updateData).eq('id', invitationId);
-
             if (updateError) {
                 setError(`Gagal memperbarui: ${updateError.message}`);
             } else {
@@ -159,7 +210,6 @@ export default function InvitationForm({ setActiveView, invitationId }: Invitati
                 acara_enabled_in: eventData.acara_enabled,
                 package_in: eventData.package,
             });
-
             if (rpcError) {
                 setError(`Server Error: ${rpcError.message}`);
             } else if (data?.[0]?.status_code === 200) {
@@ -172,7 +222,7 @@ export default function InvitationForm({ setActiveView, invitationId }: Invitati
         setLoading(false);
     };
 
-    const handleCancel = () => isEditMode ? router.push('/dashboard') : setActiveView?.('invitations');
+    const onCancel = () => setActiveView?.('invitations');
 
     if (loading && isEditMode) return <div className="text-center p-8">Memuat data undangan...</div>;
 
@@ -182,12 +232,12 @@ export default function InvitationForm({ setActiveView, invitationId }: Invitati
             <div className="mt-8">
                 {isEditMode ? (
                     <>
-                        {step === 1 && <Step1Mulai formData={formData} handleChange={handleChange} onNext={handleNext} onCancel={handleCancel} isEditMode />}
+                        {step === 1 && <Step1Mulai formData={formData} handleChange={handleChange} onNext={handleNext} onCancel={onCancel} isEditMode slugStatus={slugStatus} slugError={slugError} />}
                         {step === 2 && <Step2EditDetail formData={formData} handleChange={handleChange} onBack={handleBack} onSubmit={handleSubmit} loading={loading} error={error} />}
                     </>
                 ) : (
                     <>
-                        {step === 1 && <Step1Mulai formData={formData} handleChange={handleChange} onNext={handleNext} onCancel={handleCancel} />}
+                        {step === 1 && <Step1Mulai formData={formData} handleChange={handleChange} onNext={handleNext} onCancel={onCancel} slugStatus={slugStatus} slugError={slugError} />}
                         {step === 2 && <Step2EditDetail formData={formData} handleChange={handleChange} onBack={handleBack} onNext={handleNext} isCreateMode />}
                         {step === 3 && <Step3Paket selectedPackage={formData.selected_package} onSelect={handlePackageSelect} onBack={handleBack} onNext={handleNext} />}
                         {step === 4 && <Step4Pembayaran selectedPackage={formData.selected_package} onBack={handleBack} onSubmit={handleSubmit} loading={loading} error={error} />}
@@ -198,25 +248,14 @@ export default function InvitationForm({ setActiveView, invitationId }: Invitati
     );
 }
 
-// ==================================================================
-// KOMPONEN UNTUK SETIAP LANGKAH (TETAP SAMA, SUDAH CUKUP RESPONSIF)
-// ==================================================================
-const ToggleSwitch = ({ name, checked, onChange, label, description }: { name: string, checked: boolean, onChange: any, label: string, description: string }) => (
-    <label htmlFor={name} className="flex items-center justify-between cursor-pointer p-4 rounded-lg hover:bg-brand-champagne/50">
-        <div>
-            <p className="font-semibold text-brand-charcoal">{label}</p>
-            <p className="text-sm text-brand-charcoal/70">{description}</p>
-        </div>
-        <div className="relative">
-            <input type="checkbox" id={name} name={name} checked={checked} onChange={onChange} className="sr-only" />
-            <div className={`block w-14 h-8 rounded-full transition ${checked ? 'bg-brand-green' : 'bg-gray-200'}`}></div>
-            <div className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform ${checked ? 'transform translate-x-6' : ''}`}></div>
-        </div>
-    </label>
-);
+// ... Sisa Komponen ...
 
-function Step1Mulai({ formData, handleChange, onNext, onCancel, isEditMode = false }: { formData: Partial<FormData>, handleChange: any, onNext: () => void, onCancel: () => void, isEditMode?: boolean }) {
-    const canProceed = formData.bride_name && formData.groom_name && formData.event_name && formData.slug && formData.event_date;
+function Step1Mulai({ formData, handleChange, onNext, onCancel, isEditMode = false, slugStatus, slugError }: { formData: Partial<FormData>, handleChange: any, onNext: () => void, onCancel: () => void, isEditMode?: boolean, slugStatus: SlugStatus, slugError: string }) {
+    const isSlugValid = formData.slug && formData.slug.length > 2;
+    const canProceed = formData.bride_name && formData.groom_name && formData.event_name && formData.slug && formData.event_date && (slugStatus === 'available');
+    
+    const isSlugDisabled = isEditMode && formData.status === 'published';
+
     return (
         <div>
             <h2 className="text-2xl md:text-3xl font-serif font-bold text-brand-green">{isEditMode ? 'Edit Undangan Anda' : "Let's get started"}</h2>
@@ -237,8 +276,27 @@ function Step1Mulai({ formData, handleChange, onNext, onCancel, isEditMode = fal
                      <div>
                        <label className="font-semibold text-brand-charcoal">URL Undangan Website</label>
                        <div className="flex items-center mt-1 border-b-2 border-brand-champagne focus-within:border-brand-gold transition-colors">
-                           <input type="text" name="slug" value={formData.slug} onChange={handleChange} className="w-full p-3 outline-none" required />
+                           <input 
+                                type="text" 
+                                name="slug" 
+                                value={formData.slug} 
+                                onChange={handleChange} 
+                                className="w-full p-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
+                                required 
+                                disabled={isSlugDisabled}
+                           />
                            <span className="text-gray-500 pr-3 text-sm sm:text-base">.arumaja.id</span>
+                       </div>
+                       <div className="h-5 mt-1 text-sm">
+                           {isSlugDisabled ? (
+                               <p className="text-gray-500">URL tidak dapat diubah setelah dipublikasikan.</p>
+                           ) : (
+                               <>
+                                   {slugStatus === 'checking' && <p className="text-gray-500">Mengecek ketersediaan...</p>}
+                                   {slugStatus === 'unavailable' && <p className="text-red-500">{slugError}</p>}
+                                   {slugStatus === 'available' && isSlugValid && <p className="text-green-600">URL tersedia!</p>}
+                               </>
+                           )}
                        </div>
                     </div>
                 </div>
@@ -248,8 +306,12 @@ function Step1Mulai({ formData, handleChange, onNext, onCancel, isEditMode = fal
                 </div>
             </div>
              <div className="flex justify-end gap-4 mt-8">
-                <button type="button" onClick={onCancel} className="px-6 py-2 text-sm font-semibold text-brand-charcoal rounded-md hover:bg-brand-champagne">Batal</button>
-                <button type="button" onClick={onNext} disabled={!canProceed} className="px-8 py-2 font-bold text-white bg-brand-green rounded-md hover:opacity-90 disabled:bg-gray-400">Lanjutkan</button>
+                {isEditMode ? (
+                    <Link href="/dashboard" className="px-6 py-2 text-sm font-semibold text-brand-charcoal rounded-md hover:bg-brand-champagne">Batal</Link>
+                ) : (
+                    <button type="button" onClick={onCancel} className="px-6 py-2 text-sm font-semibold text-brand-charcoal rounded-md hover:bg-brand-champagne">Batal</button>
+                )}
+                <button type="button" onClick={onNext} disabled={!canProceed} className="px-8 py-2 font-bold text-white bg-brand-green rounded-md hover:opacity-90 disabled:bg-gray-400 disabled:cursor-not-allowed">Lanjutkan</button>
             </div>
         </div>
     );
@@ -354,3 +416,17 @@ function Step4Pembayaran({ selectedPackage, onBack, onSubmit, loading, error }: 
         </div>
     );
 }
+
+const ToggleSwitch = ({ name, checked, onChange, label, description }: { name: string, checked: boolean, onChange: any, label: string, description: string }) => (
+    <label htmlFor={name} className="flex items-center justify-between cursor-pointer p-4 rounded-lg hover:bg-brand-champagne/50">
+        <div>
+            <p className="font-semibold text-brand-charcoal">{label}</p>
+            <p className="text-sm text-brand-charcoal/70">{description}</p>
+        </div>
+        <div className="relative">
+            <input type="checkbox" id={name} name={name} checked={checked} onChange={onChange} className="sr-only" />
+            <div className={`block w-14 h-8 rounded-full transition ${checked ? 'bg-brand-green' : 'bg-gray-200'}`}></div>
+            <div className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform ${checked ? 'transform translate-x-6' : ''}`}></div>
+        </div>
+    </label>
+);

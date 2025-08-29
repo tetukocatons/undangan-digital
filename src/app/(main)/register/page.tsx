@@ -4,10 +4,11 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@/lib/supabase/client'; // <-- KEMBALIKAN IMPORT INI
 
 export default function RegisterPage() {
-  const [fullName, setFullName] = useState(''); // <-- TAMBAHKAN STATE INI
+  const supabase = createClient(); // Buat instance client langsung
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
@@ -20,7 +21,6 @@ export default function RegisterPage() {
     e.preventDefault();
     setMessage(''); setError(''); setLoading(true);
 
-    // Kirim full_name sebagai metadata
     const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
@@ -56,7 +56,6 @@ export default function RegisterPage() {
         </div>
 
         <form onSubmit={handleRegister} className="space-y-4">
-          {/* TAMBAHKAN INPUT UNTUK NAMA LENGKAP */}
           <div>
             <label htmlFor="fullName" className="block text-sm font-medium text-brand-charcoal mb-1">Nama Lengkap</label>
             <input id="fullName" type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} required
