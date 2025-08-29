@@ -7,7 +7,6 @@ import { supabase } from '@/lib/supabaseClient';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
 import Link from 'next/link';
 
-// Tipe Invitation dengan tambahan 'package'
 type Invitation = {
   id: string;
   event_name: string;
@@ -17,7 +16,6 @@ type Invitation = {
   package: string; 
 };
 
-// Komponen Ikon
 const Icon = ({ path, className = "h-5 w-5" }: { path: string; className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d={path} />
@@ -95,29 +93,70 @@ export default function InvitationsView({ setActiveView }: { setActiveView: (vie
                 loading={deleteLoading} 
             />
 
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                 <h1 className="font-serif text-3xl font-bold text-brand-green">Undangan Anda</h1>
             </div>
 
-            <div className="bg-white p-6 rounded-lg border border-brand-gold/30 shadow-sm">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                        <thead>
-                            <tr className="border-b-2 border-brand-champagne">
-                                <th className="p-3 text-sm font-semibold uppercase text-brand-charcoal/60">Nama Acara</th>
-                                <th className="p-3 text-sm font-semibold uppercase text-brand-charcoal/60">Tanggal</th>
-                                <th className="p-3 text-sm font-semibold uppercase text-brand-charcoal/60">Paket</th>
-                                <th className="p-3 text-sm font-semibold uppercase text-brand-charcoal/60">Status</th>
-                                <th className="p-3 text-sm font-semibold uppercase text-brand-charcoal/60 text-center">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {isLoading ? (
-                                <tr>
-                                    <td colSpan={5} className="text-center p-6 text-brand-charcoal/80">Memuat data...</td>
+            {/* Kontainer untuk loading dan data */}
+            <div className="bg-white p-4 sm:p-6 rounded-lg border border-brand-gold/30 shadow-sm">
+                {isLoading ? (
+                    <div className="text-center p-6 text-brand-charcoal/80">Memuat data...</div>
+                ) : invitations.length > 0 ? (
+                    <div className="space-y-4 md:hidden"> 
+                        {/* Tampilan Kartu untuk Mobile */}
+                        {invitations.map(inv => (
+                            <div key={inv.id} className="border border-brand-champagne rounded-lg p-4 space-y-3">
+                                <div className="font-semibold text-lg text-brand-green">{inv.event_name}</div>
+                                <div className="text-sm text-brand-charcoal/80">
+                                    <span className="font-semibold">Tanggal:</span> {new Date(inv.event_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                </div>
+                                <div className="text-sm">
+                                    <span className="font-semibold">Status:</span>
+                                    <span className={`ml-2 px-2 py-1 text-xs font-semibold rounded-full ${inv.status === 'published' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                                        {inv.status}
+                                    </span>
+                                </div>
+                                <div className="text-sm">
+                                    <span className="font-semibold">Paket:</span>
+                                    <span className="ml-2 capitalize font-medium text-brand-green bg-brand-gold/20 py-1 px-2 rounded-md text-xs">
+                                        {inv.package || 'N/A'}
+                                    </span>
+                                </div>
+                                <div className="flex justify-end items-center gap-4 border-t pt-3 mt-3">
+                                    <Link href={`/undangan/${inv.slug}`} target="_blank" className="text-brand-gold hover:opacity-80" title="Lihat Undangan">{icons.view}</Link>
+                                    <button onClick={() => handleEditClick(inv.id)} className="text-brand-green hover:opacity-80" title="Kelola">{icons.edit}</button>
+                                    <button onClick={() => handleDeleteClick(inv)} className="text-red-600 hover:opacity-80" title="Hapus">{icons.delete}</button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-center p-12">
+                        <p className="text-brand-charcoal/70">Belum ada undangan yang dibuat.</p>
+                        <button 
+                            onClick={() => setActiveView('create-invitation')} 
+                            className="mt-4 bg-brand-gold text-brand-green font-semibold py-2 px-4 rounded-lg hover:opacity-90"
+                        >
+                            Buat Undangan Pertama Anda!
+                        </button>
+                    </div>
+                )}
+                
+                {/* Tampilan Tabel untuk Desktop */}
+                <div className="overflow-x-auto hidden md:block">
+                    {invitations.length > 0 && (
+                        <table className="w-full text-left">
+                            <thead>
+                                <tr className="border-b-2 border-brand-champagne">
+                                    <th className="p-3 text-sm font-semibold uppercase text-brand-charcoal/60">Nama Acara</th>
+                                    <th className="p-3 text-sm font-semibold uppercase text-brand-charcoal/60">Tanggal</th>
+                                    <th className="p-3 text-sm font-semibold uppercase text-brand-charcoal/60">Paket</th>
+                                    <th className="p-3 text-sm font-semibold uppercase text-brand-charcoal/60">Status</th>
+                                    <th className="p-3 text-sm font-semibold uppercase text-brand-charcoal/60 text-center">Aksi</th>
                                 </tr>
-                            ) : invitations.length > 0 ? (
-                                invitations.map(inv => (
+                            </thead>
+                            <tbody>
+                                {invitations.map(inv => (
                                     <tr key={inv.id} className="border-b border-brand-champagne hover:bg-brand-champagne/50">
                                         <td className="p-3 font-semibold">{inv.event_name}</td>
                                         <td className="p-3">{new Date(inv.event_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</td>
@@ -139,22 +178,10 @@ export default function InvitationsView({ setActiveView }: { setActiveView: (vie
                                             </div>
                                         </td>
                                     </tr>
-                                ))
-                            ) : (
-                                <tr>
-                                    <td colSpan={5} className="text-center p-12">
-                                        <p className="text-brand-charcoal/70">Belum ada undangan yang dibuat.</p>
-                                        <button 
-                                            onClick={() => setActiveView('create-invitation')} 
-                                            className="mt-4 bg-brand-gold text-brand-green font-semibold py-2 px-4 rounded-lg hover:opacity-90"
-                                        >
-                                            Buat Undangan Pertama Anda!
-                                        </button>
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
                 </div>
             </div>
         </div>

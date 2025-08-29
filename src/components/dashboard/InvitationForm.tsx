@@ -25,10 +25,10 @@ type FormData = {
     selected_package: string;
 };
 
-// Komponen untuk menampilkan progress bar/stepper
+// Komponen Stepper yang DITINGKATKAN untuk mobile
 const Stepper = ({ currentStep, steps }: { currentStep: number, steps: string[] }) => {
     return (
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-8 w-full">
             {steps.map((label, index) => {
                 const stepNumber = index + 1;
                 const isActive = stepNumber <= currentStep;
@@ -42,9 +42,10 @@ const Stepper = ({ currentStep, steps }: { currentStep: number, steps: string[] 
                             >
                                 {stepNumber}
                             </div>
-                            <p className={`mt-2 text-sm transition-colors duration-300 ${isActive ? 'text-brand-green font-semibold' : 'text-gray-500'}`}>{label}</p>
+                            {/* Teks hanya muncul di layar sm ke atas */}
+                            <p className={`mt-2 text-xs sm:text-sm transition-colors duration-300 ${isActive ? 'text-brand-green font-semibold' : 'text-gray-500'}`}>{label}</p>
                         </div>
-                        {stepNumber < steps.length && <div className="flex-1 h-0.5 bg-brand-champagne mx-4"></div>}
+                        {stepNumber < steps.length && <div className={`flex-1 h-0.5 mx-2 transition-colors duration-300 ${isActive ? 'bg-brand-green' : 'bg-brand-champagne'}`}></div>}
                     </React.Fragment>
                 );
             })}
@@ -65,7 +66,7 @@ export default function InvitationForm({ setActiveView, invitationId }: Invitati
     const router = useRouter();
     
     const isEditMode = !!invitationId;
-    const formSteps = isEditMode ? ["Detail Undangan", "Lokasi & Fitur"] : ["Mulai", "Detail Pernikahan", "Paket", "Pembayaran"];
+    const formSteps = isEditMode ? ["Detail", "Fitur"] : ["Mulai", "Detail", "Paket", "Bayar"];
 
     useEffect(() => {
         if (isEditMode) {
@@ -135,7 +136,6 @@ export default function InvitationForm({ setActiveView, invitationId }: Invitati
         };
 
         if (isEditMode) {
-            // Saat edit, paket tidak diubah. Hapus dari data update.
             const { package: _, ...updateData } = eventData;
             const { error: updateError } = await supabase.from('events').update(updateData).eq('id', invitationId);
 
@@ -146,7 +146,6 @@ export default function InvitationForm({ setActiveView, invitationId }: Invitati
                 router.push('/dashboard');
             }
         } else {
-            // Panggil RPC dengan semua parameter, termasuk paket
             const { data, error: rpcError } = await supabase.rpc('create_new_event', {
                 bride_name_in: eventData.bride_name,
                 groom_name_in: eventData.groom_name,
@@ -178,7 +177,7 @@ export default function InvitationForm({ setActiveView, invitationId }: Invitati
     if (loading && isEditMode) return <div className="text-center p-8">Memuat data undangan...</div>;
 
     return (
-        <div className="bg-white p-8 rounded-lg border border-brand-gold/30 shadow-sm max-w-3xl mx-auto">
+        <div className="bg-white p-4 sm:p-8 rounded-lg border border-brand-gold/30 shadow-sm max-w-3xl mx-auto">
             <Stepper currentStep={step} steps={formSteps} />
             <div className="mt-8">
                 {isEditMode ? (
@@ -200,7 +199,7 @@ export default function InvitationForm({ setActiveView, invitationId }: Invitati
 }
 
 // ==================================================================
-// KOMPONEN UNTUK SETIAP LANGKAH
+// KOMPONEN UNTUK SETIAP LANGKAH (TETAP SAMA, SUDAH CUKUP RESPONSIF)
 // ==================================================================
 const ToggleSwitch = ({ name, checked, onChange, label, description }: { name: string, checked: boolean, onChange: any, label: string, description: string }) => (
     <label htmlFor={name} className="flex items-center justify-between cursor-pointer p-4 rounded-lg hover:bg-brand-champagne/50">
@@ -220,7 +219,7 @@ function Step1Mulai({ formData, handleChange, onNext, onCancel, isEditMode = fal
     const canProceed = formData.bride_name && formData.groom_name && formData.event_name && formData.slug && formData.event_date;
     return (
         <div>
-            <h2 className="text-3xl font-serif font-bold text-brand-green">{isEditMode ? 'Edit Undangan Anda' : "Let's get started"}</h2>
+            <h2 className="text-2xl md:text-3xl font-serif font-bold text-brand-green">{isEditMode ? 'Edit Undangan Anda' : "Let's get started"}</h2>
             <p className="text-brand-charcoal/80 mt-2">{isEditMode ? 'Ubah detail undangan Anda di bawah ini.' : 'Harap isi formulir untuk melanjutkan pemesanan.'}</p>
             <div className="mt-8 space-y-6">
                 <fieldset>
@@ -239,7 +238,7 @@ function Step1Mulai({ formData, handleChange, onNext, onCancel, isEditMode = fal
                        <label className="font-semibold text-brand-charcoal">URL Undangan Website</label>
                        <div className="flex items-center mt-1 border-b-2 border-brand-champagne focus-within:border-brand-gold transition-colors">
                            <input type="text" name="slug" value={formData.slug} onChange={handleChange} className="w-full p-3 outline-none" required />
-                           <span className="text-gray-500 pr-3">.arumaja.id</span>
+                           <span className="text-gray-500 pr-3 text-sm sm:text-base">.arumaja.id</span>
                        </div>
                     </div>
                 </div>
