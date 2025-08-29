@@ -62,26 +62,64 @@ export default function GuestManager({ eventId, eventName }: GuestManagerProps) 
 
     const handleAddGuest = async (e: React.FormEvent) => {
         e.preventDefault();
-        if(!newGuest.name || (!newGuest.phone && !newGuest.email)) {
+        if (!newGuest.name || (!newGuest.phone && !newGuest.email)) {
             alert('Nama dan salah satu (No HP atau Email) wajib diisi.');
             return;
         }
 
         setFormLoading(true);
-        const { error } = await supabase.from('guests').insert([{ 
-            name: newGuest.name, 
-            phone: newGuest.phone || null,
-            email: newGuest.email || null,
-            event_id: eventId,
-        }]);
 
-        if (error) {
-            alert(`Gagal menambahkan tamu: ${error.message}`);
-        } else {
+        try {
+            // --- PERBAIKAN: Logika Pengecekan Duplikat ---
+            const uniquenessFilters = [];
+            const trimmedPhone = newGuest.phone.trim();
+            const trimmedEmail = newGuest.email.trim().toLowerCase();
+
+            if (trimmedPhone) {
+                uniquenessFilters.push(`phone.eq.${trimmedPhone}`);
+            }
+            if (trimmedEmail) {
+                uniquenessFilters.push(`email.eq.${trimmedEmail}`);
+            }
+
+            if (uniquenessFilters.length > 0) {
+                const { data: existingGuest, error: checkError } = await supabase
+                    .from('guests')
+                    .select('id')
+                    .eq('event_id', eventId)
+                    .or(uniquenessFilters.join(','));
+
+                if (checkError) {
+                    throw new Error(`Gagal memvalidasi tamu: ${checkError.message}`);
+                }
+
+                if (existingGuest && existingGuest.length > 0) {
+                    alert('Tamu dengan No. HP atau Email tersebut sudah ada di dalam daftar.');
+                    setFormLoading(false);
+                    return; // Hentikan proses jika duplikat ditemukan
+                }
+            }
+            // --- AKHIR DARI LOGIKA PENGECEKAN ---
+
+            const { error: insertError } = await supabase.from('guests').insert([{
+                name: newGuest.name.trim(),
+                phone: trimmedPhone || null,
+                email: trimmedEmail || null,
+                event_id: eventId,
+            }]);
+
+            if (insertError) {
+                throw new Error(`Gagal menambahkan tamu: ${insertError.message}`);
+            }
+
             setNewGuest({ name: '', phone: '', email: '' });
-            await fetchGuests(); // Refresh list
+            await fetchGuests();
+
+        } catch (error: any) {
+            alert(error.message);
+        } finally {
+            setFormLoading(false);
         }
-        setFormLoading(false);
     };
     
     const handleDeleteGuest = async (guestId: string) => {
@@ -90,7 +128,7 @@ export default function GuestManager({ eventId, eventName }: GuestManagerProps) 
             if (error) {
                 alert(`Gagal menghapus tamu: ${error.message}`);
             } else {
-                await fetchGuests(); // Refresh list
+                await fetchGuests();
             }
         }
     };
