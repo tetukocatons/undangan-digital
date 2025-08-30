@@ -3,7 +3,6 @@
 
 import { UserProfile } from '@/contexts/AuthContext';
 
-// Tambahkan prop `isOpen` dan `toggle` untuk kontrol dari parent
 type SidebarProps = {
   activeView: string;
   setActiveView: (view: string) => void;
@@ -13,9 +12,10 @@ type SidebarProps = {
   toggle: () => void;
 };
 
+// Menu baru yang lebih sesuai dengan alur kerja
 const menu = [
   { id: 'dashboard', name: 'Dashboard' },
-  { id: 'invitations', name: 'Undangan' },
+  { id: 'manage-invitation', name: 'Undangan' }, // Menu baru untuk manajemen
   { id: 'account', name: 'Akun' },
 ];
 
@@ -26,7 +26,6 @@ const adminMenu = [
 
 export default function Sidebar({ activeView, setActiveView, onLogout, profile, isOpen, toggle }: SidebarProps) {
   
-  // Fungsi untuk menutup sidebar setelah item menu diklik di mode mobile
   const handleItemClick = (view: string) => {
     setActiveView(view);
     if (isOpen) {
@@ -86,18 +85,15 @@ export default function Sidebar({ activeView, setActiveView, onLogout, profile, 
   
   return (
     <>
-      {/* Sidebar untuk Desktop */}
       <aside className="w-64 bg-brand-green text-brand-off-white min-h-screen p-4 hidden md:flex flex-col">
         {sidebarContent}
       </aside>
 
-      {/* Mobile Menu Overlay */}
       <div 
         className={`fixed inset-0 z-40 bg-black/50 transition-opacity md:hidden ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-        onClick={toggle} // Menutup menu saat klik di luar area sidebar
+        onClick={toggle}
       ></div>
 
-      {/* Sidebar untuk Mobile (sliding) */}
       <aside 
         className={`fixed top-0 left-0 z-50 w-64 h-full bg-brand-green text-brand-off-white p-4 transform transition-transform md:hidden ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >

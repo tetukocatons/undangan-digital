@@ -1,7 +1,7 @@
 // src/app/(app)/dashboard/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { handleLogout } from '@/lib/logout';
@@ -9,9 +9,9 @@ import Sidebar from '@/components/dashboard/Sidebar';
 import AccountSettings from '@/components/dashboard/AccountSettings';
 import InvitationsView from '@/components/dashboard/InvitationsView';
 import InvitationForm from '@/components/dashboard/InvitationForm';
-import { SupabaseClient } from '@supabase/supabase-js'; // Import SupabaseClient type
+import InvitationManagementView from '@/components/dashboard/InvitationManagementView'; // Import komponen baru
+import { SupabaseClient } from '@supabase/supabase-js';
 
-// Komponen Ikon Hamburger
 const MenuIcon = ({ className = "w-6 h-6" }) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
@@ -28,19 +28,20 @@ type Invitation = {
   status: string;
   slug: string;
   package: string;
+  theme_id: string | null;
 };
 
 export default function DashboardPage() {
-  const { user, profile, isLoading: isAuthLoading, supabase } = useAuth(); // Dapatkan supabase dari context
-  const [activeView, setActiveView] = useState<string>('invitations');
+  const { user, profile, isLoading: isAuthLoading, supabase } = useAuth();
+  const [activeView, setActiveView] = useState<string>('dashboard'); // Default view baru adalah 'dashboard'
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const router = useRouter();
 
   const [invitations, setInvitations] = useState<Invitation[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingData, setIsLoadingData] = useState(true);
 
-  const fetchInvitations = async () => {
-    setIsLoading(true);
+  const fetchInvitations = useCallback(async () => {
+    setIsLoadingData(true);
     const { data, error } = await supabase
         .from('events')
         .select('*')
@@ -52,21 +53,21 @@ export default function DashboardPage() {
     } else {
         setInvitations(data as Invitation[]);
     }
-    setIsLoading(false);
-  };
+    setIsLoadingData(false);
+  }, [supabase]);
 
   useEffect(() => {
     fetchInvitations();
-  }, []);
+  }, [fetchInvitations]);
 
   const onLogout = () => {
-    // Teruskan supabase client ke handleLogout
     handleLogout(router, supabase);
   };
 
   const handleInvitationCreated = () => {
     fetchInvitations();
-    setActiveView('invitations');
+    // Kembali ke daftar undangan setelah selesai membuat/mengedit
+    setActiveView('dashboard');
   };
 
   const renderContent = () => {
@@ -75,12 +76,18 @@ export default function DashboardPage() {
         return <AccountSettings />;
       case 'create-invitation':
         return <InvitationForm setActiveView={handleInvitationCreated} />;
-      case 'invitations':
+      case 'dashboard': // View utama sekarang adalah daftar undangan
         return <InvitationsView 
                   invitations={invitations}
-                  isLoading={isLoading}
+                  isLoading={isLoadingData}
                   refreshInvitations={fetchInvitations}
                   setActiveView={setActiveView} 
+               />;
+      case 'manage-invitation': // View baru untuk manajemen tema & tamu
+        return <InvitationManagementView
+                  invitations={invitations}
+                  isLoading={isLoadingData}
+                  refreshInvitations={fetchInvitations}
                />;
       case 'user-management':
         if (profile?.role === 'administrator') return <UserManagement />;
