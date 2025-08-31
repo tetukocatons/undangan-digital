@@ -1,87 +1,93 @@
 // src/components/dashboard/InvitationManagementView.tsx
 'use client';
 
-import React, { useState } from 'react';
-import Link from 'next/link';
+import React, { useState, useEffect } from 'react';
 import ThemeSelector from './ThemeSelector';
+import FeatureManagement from './FeatureManagement';
+import InvitationDetailsForm from './InvitationDetailsForm';
 
 type Invitation = {
-  id: string;
-  event_name: string;
-  event_date: string;
-  theme_id: string | null;
+  id: string; event_name: string; event_date: string; theme_id: string | null;
+  bride_name: string; groom_name: string; slug: string; location: string;
+  latitude: number | null; longitude: number | null; couple_enabled: boolean;
+  story_enabled: boolean; gallery_enabled: boolean; acara_enabled: boolean; gift_enabled: boolean;
 };
 
 type InvitationManagementViewProps = {
     invitations: Invitation[];
     isLoading: boolean;
     refreshInvitations: () => void;
+    // ID undangan yang sedang aktif dikelola
+    managedInvitationId: string | null; 
+    // Fungsi untuk mengubah ID undangan yang dikelola
+    onInvitationChange: (id: string) => void;
 };
 
-export default function InvitationManagementView({ invitations, isLoading, refreshInvitations }: InvitationManagementViewProps) {
-    const [selectedInvitation, setSelectedInvitation] = useState<Invitation | null>(null);
+export default function InvitationManagementView({ 
+    invitations, 
+    isLoading, 
+    refreshInvitations, 
+    managedInvitationId,
+    onInvitationChange
+}: InvitationManagementViewProps) {
+    const [activeTab, setActiveTab] = useState<'details' | 'features' | 'themes'>('details');
+
+    const selectedInvitation = invitations.find(inv => inv.id === managedInvitationId);
 
     if (isLoading) {
-        return <div className="text-center p-6 text-brand-charcoal/80">Memuat data undangan...</div>;
+        return <div className="text-center p-6 text-brand-charcoal/80">Memuat data...</div>;
     }
 
     if (!selectedInvitation) {
         return (
             <div className="space-y-6">
                 <h1 className="font-serif text-3xl font-bold text-brand-green">Manajemen Undangan</h1>
-                <p className="text-brand-charcoal/80">Pilih undangan yang ingin Anda kelola untuk mengatur tema dan daftar tamu.</p>
-                
-                {invitations.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {invitations.map(inv => (
-                            <div key={inv.id} className="bg-white p-6 rounded-lg border border-brand-gold/30 shadow-sm flex flex-col justify-between">
-                                <div>
-                                    <h2 className="font-serif text-xl font-bold text-brand-green">{inv.event_name}</h2>
-                                    <p className="text-sm text-brand-charcoal/70 mt-1">
-                                        {new Date(inv.event_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
-                                    </p>
-                                </div>
-                                <button 
-                                    onClick={() => setSelectedInvitation(inv)}
-                                    className="mt-4 w-full bg-brand-green text-white font-semibold py-2 px-4 rounded-lg hover:opacity-90"
-                                >
-                                    Kelola
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <p className="text-center p-12 text-brand-charcoal/70">Anda belum memiliki undangan. Silakan buat di halaman Dashboard.</p>
-                )}
+                <div className="text-center p-12 bg-white rounded-lg border border-brand-gold/30">
+                     <p className="text-brand-charcoal/70">Anda belum memiliki undangan. Silakan buat undangan baru dari menu Dashboard.</p>
+                </div>
             </div>
         );
     }
+    
+    const initialFeatures = {
+        couple_enabled: selectedInvitation.couple_enabled, story_enabled: selectedInvitation.story_enabled,
+        gallery_enabled: selectedInvitation.gallery_enabled, acara_enabled: selectedInvitation.acara_enabled,
+        gift_enabled: selectedInvitation.gift_enabled,
+    };
 
-    // Jika sudah ada undangan yang dipilih
     return (
-        <div>
-            <button onClick={() => setSelectedInvitation(null)} className="text-sm text-brand-green hover:underline mb-4">
-                &larr; Kembali ke Daftar Undangan
-            </button>
+        <div className="space-y-6">
+             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                 <h1 className="font-serif text-3xl font-bold text-brand-green">Manajemen Undangan</h1>
+                 {invitations.length > 1 && (
+                    <div className="flex items-center gap-2">
+                        <label htmlFor="inv-select" className="text-sm font-semibold text-brand-charcoal">Pilih Undangan:</label>
+                        <select
+                            id="inv-select"
+                            value={selectedInvitation.id}
+                            onChange={(e) => onInvitationChange(e.target.value)}
+                            className="p-2 rounded-md bg-white border border-brand-gold/50 text-brand-charcoal"
+                        >
+                            {invitations.map(inv => (
+                                <option key={inv.id} value={inv.id}>{inv.event_name}</option>
+                            ))}
+                        </select>
+                    </div>
+                 )}
+            </div>
             <div className="bg-white p-6 rounded-lg border border-brand-gold/30 shadow-sm">
-                <h1 className="font-serif text-xl font-bold text-brand-green">{selectedInvitation.event_name}</h1>
-                <div className="mt-4 border-t pt-4">
-                    <Link 
-                        href={`/dashboard/invitation/${selectedInvitation.id}/guests`}
-                        className="inline-block bg-brand-gold text-brand-green font-semibold py-2 px-4 rounded-lg hover:opacity-90"
-                    >
-                        Kelola Daftar Tamu
-                    </Link>
+                <div className="border-b border-brand-gold/30 mb-6">
+                    <nav className="flex space-x-4">
+                        <button onClick={() => setActiveTab('details')} className={`py-2 px-4 font-semibold transition-colors ${activeTab === 'details' ? 'border-b-2 border-brand-green text-brand-green' : 'text-brand-charcoal/70 hover:text-brand-green'}`}>Informasi & Lokasi</button>
+                        <button onClick={() => setActiveTab('features')} className={`py-2 px-4 font-semibold transition-colors ${activeTab === 'features' ? 'border-b-2 border-brand-green text-brand-green' : 'text-brand-charcoal/70 hover:text-brand-green'}`}>Fitur Undangan</button>
+                        <button onClick={() => setActiveTab('themes')} className={`py-2 px-4 font-semibold transition-colors ${activeTab === 'themes' ? 'border-b-2 border-brand-green text-brand-green' : 'text-brand-charcoal/70 hover:text-brand-green'}`}>Pilih Tema</button>
+                    </nav>
                 </div>
-                <ThemeSelector 
-                    invitationId={selectedInvitation.id}
-                    currentThemeId={selectedInvitation.theme_id}
-                    onThemeUpdate={() => {
-                        // Refresh data dan reset view untuk melihat perubahan
-                        refreshInvitations();
-                        setSelectedInvitation(null);
-                    }}
-                />
+                <div>
+                    {activeTab === 'details' && <InvitationDetailsForm invitation={selectedInvitation} onUpdate={refreshInvitations} />}
+                    {activeTab === 'features' && <FeatureManagement invitationId={selectedInvitation.id} initialFeatures={initialFeatures} onUpdate={refreshInvitations} />}
+                    {activeTab === 'themes' && <ThemeSelector invitationId={selectedInvitation.id} currentThemeId={selectedInvitation.theme_id} onThemeUpdate={refreshInvitations} />}
+                </div>
             </div>
         </div>
     );

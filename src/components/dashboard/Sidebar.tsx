@@ -12,11 +12,14 @@ type SidebarProps = {
   toggle: () => void;
 };
 
-// Menu baru yang lebih sesuai dengan alur kerja
+// --- PERUBAHAN MENU SIDEBAR ---
 const menu = [
   { id: 'dashboard', name: 'Dashboard' },
-  { id: 'manage-invitation', name: 'Undangan' }, // Menu baru untuk manajemen
-  { id: 'account', name: 'Akun' },
+  { id: 'manage-invitation', name: 'Undangan' },
+  { id: 'guest-management', name: 'Tamu & RSVP' },
+  { id: 'settings', name: 'Pengaturan' },
+  { id: 'help', name: 'Bantuan' },
+  { id: 'account', name: 'Akun Saya' },
 ];
 
 const adminMenu = [

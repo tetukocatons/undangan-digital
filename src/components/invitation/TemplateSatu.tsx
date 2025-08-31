@@ -12,6 +12,8 @@ type InvitationData = {
   akad_location: string;
   resepsi_time: string;
   resepsi_location: string;
+  latitude: number | null;
+  longitude: number | null;
   story: { year: string; title: string; description: string }[];
   gallery_images: string[];
 };
@@ -40,7 +42,7 @@ const HeroSection = ({ bride_name, groom_name, event_date, guestName }: { bride_
         <section id="hero" className="h-screen bg-cover bg-center flex flex-col justify-center items-center text-white text-center p-4" style={{ backgroundImage: "url('https://placehold.co/1080x1920/2A4032/F4EFE6?text=Foto+Pre-wedding')" }}>
             <div className="bg-black bg-opacity-40 p-8 rounded-lg">
                 <p className="font-sans text-lg">Pernikahan</p>
-                <h1 className="font-serif text-6xl md:text-8xl my-4">{groom_name} &amp; {bride_name}</h1>
+                <h1 className="font-serif text-6xl md:text-8xl my-4">{groom_name} & {bride_name}</h1>
                 <p className="font-sans font-bold text-xl">{formattedDate}</p>
                 <div className="mt-12">
                     <p className="text-md">Kepada Yth.</p>
@@ -69,8 +71,28 @@ const CoupleSection = ({ bride_name, groom_name }: { bride_name: string; groom_n
     </section>
 );
 
-const EventSection = ({ event_date, akad_time, akad_location, resepsi_time, resepsi_location }: { event_date: string; akad_time: string; akad_location: string; resepsi_time: string; resepsi_location: string; }) => {
+const EventSection = ({ 
+    event_date, 
+    akad_time, 
+    akad_location, 
+    resepsi_time, 
+    resepsi_location,
+    latitude,
+    longitude 
+}: { 
+    event_date: string; 
+    akad_time: string; 
+    akad_location: string; 
+    resepsi_time: string; 
+    resepsi_location: string;
+    latitude: number | null;
+    longitude: number | null;
+}) => {
     const formattedDate = new Date(event_date).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    
+    // PERBAIKAN: Membuat URL Peta Dinamis
+    const mapSrc = `https://www.google.com/maps/embed/v1/place?key=MASUKKAN_API_KEY_ANDA&q=$${latitude},${longitude}`;
+
     return (
         <section id="event" className="py-20 px-4 bg-brand-off-white text-center">
             <h2 className="font-serif text-4xl text-brand-green mb-12">Detail Acara</h2>
@@ -93,16 +115,18 @@ const EventSection = ({ event_date, akad_time, akad_location, resepsi_time, rese
                 </div>
             </div>
             <div className="mt-12">
-                 <iframe 
-                    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3966.666421948393!2d106.82458407498979!3d-6.17539239380962!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e69f5d2e764b12d%3A0x3d2ad6e1e0e9bcc8!2sMonumen%20Nasional!5e0!3m2!1sid!2sid!4v1693301431260!5m2!1sid!2sid" 
-                    width="100%" 
-                    height="450" 
-                    style={{ border:0 }} 
-                    allowFullScreen={true}
-                    loading="lazy" 
-                    referrerPolicy="no-referrer-when-downgrade"
-                    className="max-w-4xl mx-auto rounded-lg shadow-md">
-                </iframe>
+                 {latitude && longitude && (
+                    <iframe 
+                        src={mapSrc}
+                        width="100%" 
+                        height="450" 
+                        style={{ border:0 }} 
+                        allowFullScreen={true}
+                        loading="lazy" 
+                        referrerPolicy="no-referrer-when-downgrade"
+                        className="max-w-4xl mx-auto rounded-lg shadow-md">
+                    </iframe>
+                 )}
             </div>
         </section>
     );
@@ -167,6 +191,8 @@ export default function TemplateSatu({ data, guestName }: TemplateSatuProps) {
                     akad_location={data.akad_location}
                     resepsi_time={data.resepsi_time}
                     resepsi_location={data.resepsi_location}
+                    latitude={data.latitude}
+                    longitude={data.longitude}
                 />
                 <StorySection story={data.story} />
                 <GallerySection images={data.gallery_images} />
@@ -174,7 +200,7 @@ export default function TemplateSatu({ data, guestName }: TemplateSatuProps) {
             </main>
             <footer className="py-12 bg-brand-green text-center text-brand-off-white/70">
                 <p>Terima kasih atas doa restunya.</p>
-                <p className="font-serif text-2xl text-white mt-2">{data.groom_name} &amp; {data.bride_name}</p>
+                <p className="font-serif text-2xl text-white mt-2">{data.groom_name} & {data.bride_name}</p>
             </footer>
         </div>
     );
