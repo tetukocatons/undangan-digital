@@ -2,11 +2,17 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation'; // PERUBAIKAN 1: Import useRouter
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import LocationPicker from './LocationPicker';
 import ConfirmationModal from './ConfirmationModal';
+
+// Tambahkan deklarasi window agar TypeScript mengenali "snap"
+declare global {
+    interface Window {
+        snap: any;
+    }
+}
 
 // Tipe data untuk form
 type FormData = {
@@ -43,9 +49,9 @@ const Stepper = ({ currentStep, steps }: { currentStep: number, steps: string[] 
 };
 
 // Komponen Form Utama
-export default function InvitationForm({ setActiveView, invitationId }: { setActiveView?: (view: string) => void; invitationId?: string; }) { // PERUBAIKAN 2: setActiveView dibuat opsional
+export default function InvitationForm({ setActiveView, invitationId }: { setActiveView?: (view: string) => void; invitationId?: string; }) {
     const { supabase, user } = useAuth();
-    const router = useRouter(); // PERUBAIKAN 3: Inisialisasi router
+    const router = useRouter();
     const [step, setStep] = useState(1);
     const [formData, setFormData] = useState<FormData>({
         bride_name: '', groom_name: '', event_name: '', slug: '', event_date: '', 
@@ -115,7 +121,6 @@ export default function InvitationForm({ setActiveView, invitationId }: { setAct
 
     const handleBack = () => setStep(prev => prev - 1);
     
-    // PERUBAIKAN 4: Logika untuk kembali/batal
     const onCancel = () => {
         if (setActiveView) {
             setActiveView('dashboard');
@@ -159,36 +164,7 @@ export default function InvitationForm({ setActiveView, invitationId }: { setAct
             setStep(targetStep);
         }
     };
-
-    const finalSubmit = async () => {
-        if (!user || !currentInvitationId) {
-            setError("Terjadi kesalahan, ID undangan tidak ditemukan.");
-            return;
-        }
-        setLoading(true);
-        setError('');
-        
-        const dataToPublish = { 
-            ...formData,
-            slug: `${formData.slug}.arumaja.id`,
-            status: 'published' 
-        };
-
-        const { error: updateError } = await supabase.from('events').update(dataToPublish).eq('id', currentInvitationId);
-        
-        setLoading(false);
-        if (updateError) setError(`Gagal mempublikasikan undangan: ${updateError.message}`);
-        else {
-            alert('Selamat! Undangan Anda telah berhasil dipublikasikan.');
-            if (setActiveView) {
-                setActiveView('dashboard');
-            } else {
-                router.push('/dashboard');
-            }
-        }
-    };
     
-    // PERUBAIKAN 5: Logika untuk menyimpan perubahan di halaman edit
     const saveEditChanges = async () => {
         if (!user || !currentInvitationId) {
             setError("Terjadi kesalahan, ID undangan tidak ditemukan.");
@@ -208,7 +184,6 @@ export default function InvitationForm({ setActiveView, invitationId }: { setAct
         if (updateError) setError(`Gagal menyimpan perubahan: ${updateError.message}`);
         else {
             alert('Perubahan berhasil disimpan!');
-            // Jika tidak ada setActiveView (artinya di halaman edit), gunakan router
             if (setActiveView) {
                 setActiveView('dashboard');
             } else {
@@ -216,6 +191,73 @@ export default function InvitationForm({ setActiveView, invitationId }: { setAct
             }
         }
     }
+
+    // FUNGSI BARU UNTUK MEMPROSES PEMBAYARAN
+    const handlePayment = async () => {
+        if (!currentInvitationId) {
+            setError("ID Undangan tidak ditemukan. Silakan coba lagi.");
+            return;
+        }
+        setLoading(true);
+        setError('');
+
+        try {
+            const response = await fetch('/api/payment/create-transaction', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    invitationId: currentInvitationId,
+                    selectedPackage: formData.package,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Gagal membuat transaksi.');
+            }
+            
+            // Handle paket gratis (Bronze)
+            if (data.free_package) {
+                alert('Selamat! Undangan Anda telah berhasil dipublikasikan.');
+                 if (setActiveView) {
+                    setActiveView('dashboard');
+                } else {
+                    router.push('/dashboard');
+                }
+                return;
+            }
+
+            // Jika ada token, buka popup pembayaran Midtrans Snap
+            if (data.token) {
+                window.snap.pay(data.token, {
+                    onSuccess: function(result: any){
+                        console.log('success', result);
+                        alert("Pembayaran berhasil! Undangan Anda akan segera dipublikasikan.");
+                        router.push('/dashboard');
+                    },
+                    onPending: function(result: any){
+                        console.log('pending', result);
+                        alert("Menunggu pembayaran Anda. Anda akan dinotifikasi jika sudah berhasil.");
+                        router.push('/dashboard');
+                    },
+                    onError: function(result: any){
+                        console.log('error', result);
+                        setError('Pembayaran gagal. Silakan coba lagi.');
+                    },
+                    onClose: function(){
+                        console.log('Popup pembayaran ditutup tanpa menyelesaikan transaksi.');
+                        setError('Anda menutup jendela pembayaran sebelum selesai.');
+                    }
+                });
+            }
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value, type, checked } = e.target;
@@ -244,7 +286,8 @@ export default function InvitationForm({ setActiveView, invitationId }: { setAct
                 onClose={() => setConfirmModalOpen(false)}
                 onConfirm={() => {
                     setConfirmModalOpen(false);
-                    saveDraftAndProceed(4);
+                    // Langsung ke pembayaran, tidak lagi ke step 4
+                    handlePayment(); 
                 }}
                 data={formData}
             />
@@ -261,8 +304,22 @@ export default function InvitationForm({ setActiveView, invitationId }: { setAct
                     <>
                         {step === 1 && <Step1Mulai formData={formData} handleChange={handleChange} onNext={() => saveDraftAndProceed(2)} onCancel={onCancel} slugStatus={slugStatus} slugError={slugError} loading={loading} />}
                         {step === 2 && <Step2Lokasi formData={formData} onLocationChange={handleLocationChange} onBack={handleBack} onNext={() => saveDraftAndProceed(3)} isCreateMode loading={loading} />}
-                        {step === 3 && <Step4Paket selectedPackage={formData.package} onSelect={handlePackageSelect} onBack={handleBack} onNext={() => setConfirmModalOpen(true)} />}
-                        {step === 4 && <Step5Pembayaran selectedPackage={formData.package} onBack={handleBack} onSubmit={finalSubmit} loading={loading} error={error} />}
+                        
+                        {/* Ganti onNext agar memanggil handlePayment jika paket Bronze, atau buka modal jika berbayar */}
+                        {step === 3 && <Step4Paket 
+                            selectedPackage={formData.package} 
+                            onSelect={handlePackageSelect} 
+                            onBack={handleBack} 
+                            onNext={() => {
+                                if (formData.package === 'bronze') {
+                                    handlePayment(); // Langsung proses jika gratis
+                                } else {
+                                    setConfirmModalOpen(true); // Tampilkan modal jika berbayar
+                                }
+                            }} 
+                        />}
+
+                        {/* Step 4 (Pembayaran) sekarang dikelola oleh handlePayment, jadi tidak perlu dirender */}
                     </>
                 )}
             </div>
@@ -270,7 +327,7 @@ export default function InvitationForm({ setActiveView, invitationId }: { setAct
     );
 }
 
-// --- Komponen-komponen Step (Tidak ada perubahan) ---
+// --- Komponen-komponen Step ---
 function Step1Mulai({ formData, handleChange, onNext, onCancel, isEditMode = false, slugStatus, slugError, loading }: { formData: Partial<FormData>, handleChange: any, onNext: () => void, onCancel: () => void, isEditMode?: boolean, slugStatus: SlugStatus, slugError: string, loading?: boolean }) {
     const isSlugValid = formData.slug && formData.slug.length > 2;
     const canProceed = formData.bride_name && formData.groom_name && formData.event_name && formData.slug && formData.event_date && (slugStatus === 'available');
@@ -357,34 +414,6 @@ function Step4Paket({ selectedPackage, onSelect, onBack, onNext }: { selectedPac
             <div className="flex justify-end gap-4 mt-8">
                 <button type="button" onClick={onBack} className="px-6 py-2 text-sm font-semibold text-brand-charcoal rounded-md hover:bg-brand-champagne">Kembali</button>
                 <button type="button" onClick={onNext} className="px-8 py-2 font-bold text-white bg-brand-green rounded-md hover:opacity-90">Lanjutkan</button>
-            </div>
-        </div>
-    );
-}
-function Step5Pembayaran({ selectedPackage, onBack, onSubmit, loading, error }: { selectedPackage: string, onBack: () => void, onSubmit: () => void, loading: boolean, error: string }) {
-    const packageDetails: { [key: string]: { title: string, price: string } } = {
-        bronze: { title: 'Bronze', price: 'Rp 0' },
-        silver: { title: 'Silver', price: 'Rp 99.000' },
-        gold: { title: 'Gold', price: 'Rp 149.000' },
-    };
-    const currentPackage = packageDetails[selectedPackage];
-    return (
-        <div>
-            <h2 className="text-2xl font-serif font-bold text-brand-green">Langkah 4: Ringkasan & Pembayaran</h2>
-            <div className="mt-6 border rounded-lg p-6 bg-brand-champagne/50">
-                <h3 className="font-semibold text-lg text-brand-charcoal">Ringkasan Pesanan</h3>
-                <div className="flex justify-between items-center mt-4"><p>Paket {currentPackage.title}</p><p className="font-bold">{currentPackage.price}</p></div>
-                <div className="border-t my-4"></div>
-                <div className="flex justify-between items-center font-bold text-lg text-brand-charcoal"><p>Total</p><p>{currentPackage.price}</p></div>
-            </div>
-            <div className="mt-6">
-                <h3 className="font-semibold text-lg text-brand-charcoal">Metode Pembayaran</h3>
-                <p className="text-sm text-brand-charcoal/80 mt-2">Fungsionalitas pembayaran akan diimplementasikan di sini.</p>
-            </div>
-            {error && <p className="text-red-600 text-sm mt-4">{error}</p>}
-            <div className="flex justify-end gap-4 mt-8">
-                <button type="button" onClick={onBack} className="px-6 py-2 text-sm font-semibold text-brand-charcoal rounded-md hover:bg-brand-champagne">Kembali</button>
-                <button type="button" onClick={onSubmit} disabled={loading} className="px-8 py-2 font-bold text-brand-green bg-brand-gold rounded-md hover:opacity-90 disabled:bg-gray-400">{loading ? 'Memproses...' : 'Selesaikan & Buat Undangan'}</button>
             </div>
         </div>
     );
