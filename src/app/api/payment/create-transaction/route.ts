@@ -10,7 +10,7 @@ const snap = new midtransClient.Snap({
     clientKey: process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY
 });
 
-// Detail harga paket (sebaiknya ini dari database atau config terpusat)
+// Detail harga paket
 const packageDetails: { [key: string]: { price: number, name: string } } = {
     silver: { price: 99000, name: 'Paket Silver' },
     gold: { price: 149000, name: 'Paket Gold' },
@@ -48,16 +48,19 @@ export async function POST(request: Request) {
             .eq('id', user.id)
             .single();
 
-        const order_id = `ARUMAJA-${invitationId}-${Date.now()}`;
+        // === PERBAIKAN UTAMA DI SINI ===
+        // Memperpendek `order_id` agar tidak lebih dari 50 karakter
+        const shortInvitationId = invitationId.substring(0, 8); // Ambil 8 karakter pertama dari UUID
+        const order_id = `ARUMAJA-${shortInvitationId}-${Date.now()}`; // Total panjang sekarang ~30 karakter
+        // === AKHIR PERBAIKAN ===
+        
         const amount = packageDetails[selectedPackage].price;
 
-        // Jangan buat transaksi jika paketnya gratis
         if (amount === 0) {
-            // Langsung update status undangan
             await supabase.from('events').update({ 
                 package: selectedPackage,
                 payment_status: 'success',
-                status: 'published' // Langsung publish
+                status: 'published'
             }).eq('id', invitationId);
             return NextResponse.json({ free_package: true });
         }
@@ -85,24 +88,42 @@ export async function POST(request: Request) {
 
         const token = await snap.createTransactionToken(parameter);
 
-        // Simpan order_id dan status pembayaran ke database
-        const { error: updateError } = await supabase
+        const { error: transactionInsertError } = await supabase
+            .from('transactions')
+            .insert({
+                order_id: order_id,
+                event_id: invitationId,
+                user_id: user.id,
+                amount: amount,
+                status: 'pending',
+                snap_token: token,
+            });
+
+        if (transactionInsertError) {
+            throw new Error(`Gagal membuat catatan transaksi: ${transactionInsertError.message}`);
+        }
+
+        const { error: eventUpdateError } = await supabase
             .from('events')
             .update({ 
-                order_id: order_id, 
-                payment_status: 'pending',
-                package: selectedPackage
+                package: selectedPackage,
+                payment_status: 'pending'
             })
             .eq('id', invitationId);
-
-        if (updateError) {
-             return NextResponse.json({ error: `Gagal menyimpan Order ID: ${updateError.message}` }, { status: 500 });
+            
+        if (eventUpdateError) {
+             return NextResponse.json({ error: `Gagal update event: ${eventUpdateError.message}` }, { status: 500 });
         }
 
         return NextResponse.json({ token, order_id });
 
     } catch (error: any) {
-        console.error('Error creating transaction:', error);
+        // Tangkap error dari Midtrans dan kembalikan pesannya ke frontend
+        if (error.isMidtransError) {
+             console.error('Midtrans API Error:', error.message);
+             return NextResponse.json({ error: error.message, isMidtransError: true }, { status: error.httpStatusCode });
+        }
+        console.error('Internal Server Error:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
