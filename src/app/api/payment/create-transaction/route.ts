@@ -32,6 +32,51 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Data tidak valid.' }, { status: 400 });
         }
         
+        const amount = packageDetails[selectedPackage].price;
+
+        // Handle paket gratis (Bronze)
+        if (amount === 0) {
+            await supabase.from('events').update({ 
+                package: selectedPackage,
+                payment_status: 'success',
+                status: 'paid'
+            }).eq('id', invitationId);
+            return NextResponse.json({ free_package: true });
+        }
+
+        // --- PERUBAHAN UTAMA: Cek Transaksi Pending untuk Paket Spesifik ---
+        const { data: existingTransaction, error: findError } = await supabase
+            .from('transactions')
+            .select('order_id, snap_token, created_at, amount')
+            .eq('event_id', invitationId)
+            .eq('status', 'pending')
+            .eq('amount', amount) // Tambahkan pengecekan amount
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (findError) {
+            console.error("Error finding existing transaction:", findError);
+            throw new Error("Gagal memeriksa transaksi sebelumnya.");
+        }
+        
+        if (existingTransaction) {
+            const transactionDate = new Date(existingTransaction.created_at);
+            const now = new Date();
+            const hoursDiff = (now.getTime() - transactionDate.getTime()) / (1000 * 60 * 60);
+
+            // Gunakan kembali token jika ditemukan dan belum expired (24 jam)
+            if (hoursDiff < 24) {
+                console.log(`Reusing existing pending transaction for package amount ${amount}: ${existingTransaction.order_id}`);
+                return NextResponse.json({ 
+                    token: existingTransaction.snap_token, 
+                    order_id: existingTransaction.order_id 
+                });
+            }
+        }
+        // --- AKHIR PERUBAHAN ---
+
+        // Jika tidak ada transaksi pending yang cocok, lanjutkan membuat yang baru
         const { data: eventData, error: eventError } = await supabase
             .from('events')
             .select('event_name, groom_name, bride_name')
@@ -48,23 +93,9 @@ export async function POST(request: Request) {
             .eq('id', user.id)
             .single();
 
-        // === PERBAIKAN UTAMA DI SINI ===
-        // Memperpendek `order_id` agar tidak lebih dari 50 karakter
-        const shortInvitationId = invitationId.substring(0, 8); // Ambil 8 karakter pertama dari UUID
-        const order_id = `ARUMAJA-${shortInvitationId}-${Date.now()}`; // Total panjang sekarang ~30 karakter
-        // === AKHIR PERBAIKAN ===
+        const shortInvitationId = invitationId.substring(0, 8);
+        const order_id = `ARUMAJA-${shortInvitationId}-${Date.now()}`;
         
-        const amount = packageDetails[selectedPackage].price;
-
-        if (amount === 0) {
-            await supabase.from('events').update({ 
-                package: selectedPackage,
-                payment_status: 'success',
-                status: 'published'
-            }).eq('id', invitationId);
-            return NextResponse.json({ free_package: true });
-        }
-
         const parameter = {
             transaction_details: {
                 order_id: order_id,
@@ -118,7 +149,6 @@ export async function POST(request: Request) {
         return NextResponse.json({ token, order_id });
 
     } catch (error: any) {
-        // Tangkap error dari Midtrans dan kembalikan pesannya ke frontend
         if (error.isMidtransError) {
              console.error('Midtrans API Error:', error.message);
              return NextResponse.json({ error: error.message, isMidtransError: true }, { status: error.httpStatusCode });

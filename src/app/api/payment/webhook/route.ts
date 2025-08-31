@@ -27,7 +27,6 @@ export async function POST(request: Request) {
     const fraudStatus = statusResponse.fraud_status;
     const grossAmount = statusResponse.gross_amount;
 
-    // === PERBAIKAN UTAMA ===
     // 2. Cari transaksi di tabel 'transactions' berdasarkan order_id
     const { data: transaction, error: findError } = await supabaseAdmin
       .from('transactions')
@@ -54,13 +53,13 @@ export async function POST(request: Request) {
     // 4. Tentukan status baru berdasarkan notifikasi Midtrans
     let newStatus: 'pending' | 'success' | 'failed' = transaction.status as any;
     let newPaymentStatus: 'pending' | 'success' | 'failed' = 'pending';
-    let newEventStatus: 'draft' | 'published' = 'draft';
+    let newEventStatus: 'draft' | 'paid' = 'draft';
 
     if (transactionStatus === 'capture' || transactionStatus === 'settlement') {
       if (fraudStatus === 'accept') {
         newStatus = 'success';
         newPaymentStatus = 'success';
-        newEventStatus = 'published';
+        newEventStatus = 'paid'; // Diubah dari 'published' menjadi 'paid'
       }
     } else if (transactionStatus === 'cancel' || transactionStatus === 'deny' || transactionStatus === 'expire') {
       newStatus = 'failed';
@@ -72,7 +71,7 @@ export async function POST(request: Request) {
       .from('transactions')
       .update({
         status: newStatus,
-        payment_gateway_response: notificationJson, // Simpan seluruh payload untuk audit
+        payment_gateway_response: notificationJson,
       })
       .eq('order_id', orderId);
 
@@ -93,11 +92,10 @@ export async function POST(request: Request) {
 
       if (eventUpdateError) {
         console.error('Webhook DB Error: Gagal update status event.', eventUpdateError);
-        // Tetap kembalikan 200 ke Midtrans, tapi catat error ini untuk investigasi
       }
     }
 
-    // 7. Kirim respons 200 OK ke Midtrans untuk mengonfirmasi penerimaan notifikasi
+    // 7. Kirim respons 200 OK ke Midtrans
     return NextResponse.json({ status: 'ok' }, { status: 200 });
 
   } catch (error) {

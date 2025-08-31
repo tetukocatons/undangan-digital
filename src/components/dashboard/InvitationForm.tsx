@@ -21,11 +21,12 @@ type FormData = {
     couple_enabled: boolean; quotes_enabled: boolean; gallery_enabled: boolean; acara_enabled: boolean;
     package: string;
     status: string;
+    last_completed_step?: number;
 };
 
 type SlugStatus = 'idle' | 'checking' | 'available' | 'unavailable';
 
-// Komponen Stepper (tidak ada perubahan)
+// Komponen Stepper
 const Stepper = ({ currentStep, steps }: { currentStep: number, steps: string[] }) => {
     return (
         <div className="flex items-center justify-between mb-8 w-full">
@@ -59,9 +60,10 @@ export default function InvitationForm({ setActiveView, invitationId }: { setAct
         couple_enabled: true, quotes_enabled: true, gallery_enabled: true, acara_enabled: true,
         package: 'silver',
         status: 'draft',
+        last_completed_step: 0,
     });
     const [currentInvitationId, setCurrentInvitationId] = useState<string | null>(invitationId || null);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true); // Set loading awal ke true jika ada invitationId
     const [error, setError] = useState('');
     const [isConfirmModalOpen, setConfirmModalOpen] = useState(false);
     
@@ -69,14 +71,18 @@ export default function InvitationForm({ setActiveView, invitationId }: { setAct
     const [slugError, setSlugError] = useState('');
     const [initialSlug, setInitialSlug] = useState<string | null>(null);
     
-    const isEditMode = !!invitationId;
-    const formSteps = isEditMode ? ["Detail", "Lokasi"] : ["Mulai", "Lokasi", "Paket", "Bayar"];
+    // --- PERUBAHAN UTAMA: Logika untuk menentukan mode form ---
+    const isCreatingNew = !invitationId;
+    const isEditingPaid = invitationId && formData.status === 'paid';
+    const isResumingDraft = invitationId && formData.status === 'draft';
+
+    const formSteps = isEditingPaid ? ["Detail", "Lokasi"] : ["Mulai", "Lokasi", "Paket", "Bayar"];
 
     useEffect(() => {
-        if (step !== 1) return;
         const handler = setTimeout(async () => {
+            if (!supabase) return;
             const slug = formData.slug;
-            if (isEditMode && slug === initialSlug) {
+            if (invitationId && slug === initialSlug) {
                 setSlugStatus('available'); return;
             }
             if (!slug || slug.length < 3) {
@@ -84,9 +90,9 @@ export default function InvitationForm({ setActiveView, invitationId }: { setAct
             }
             setSlugStatus('checking'); setSlugError('');
             try {
-                const { data, error } = await supabase.from('events').select('id').eq('slug', `${slug}.arumaja.id`).maybeSingle();
+                const { data, error } = await supabase.from('events').select('id').eq('slug', `${formData.slug}.arumaja.id`).maybeSingle();
                 if (error) throw error;
-                if (data) {
+                if (data && data.id !== currentInvitationId) {
                     setSlugStatus('unavailable');
                     setSlugError('URL ini sudah digunakan.');
                 } else {
@@ -97,10 +103,10 @@ export default function InvitationForm({ setActiveView, invitationId }: { setAct
             }
         }, 500);
         return () => clearTimeout(handler);
-    }, [formData.slug, step, initialSlug, isEditMode, supabase]);
+    }, [formData.slug, initialSlug, invitationId, supabase, currentInvitationId]);
 
     useEffect(() => {
-        if (isEditMode && invitationId) {
+        if (invitationId && supabase) {
             const fetchInvitationData = async () => {
                 setLoading(true);
                 const { data, error } = await supabase.from('events').select('*').eq('id', invitationId).single();
@@ -112,12 +118,18 @@ export default function InvitationForm({ setActiveView, invitationId }: { setAct
                     setFormData({ ...data, slug: slugPart, event_date: eventDate, package: data.package || 'silver' });
                     setInitialSlug(slugPart);
                     setSlugStatus('available');
+                    
+                    if (data.status === 'draft' && data.last_completed_step > 0) {
+                        setStep(data.last_completed_step + 1);
+                    }
                 }
                 setLoading(false);
             };
             fetchInvitationData();
+        } else {
+            setLoading(false); // Jika membuat baru, tidak perlu loading
         }
-    }, [invitationId, isEditMode, supabase]);
+    }, [invitationId, supabase]);
 
     const handleBack = () => setStep(prev => prev - 1);
     
@@ -130,19 +142,21 @@ export default function InvitationForm({ setActiveView, invitationId }: { setAct
     };
 
     const saveDraftAndProceed = async (targetStep: number) => {
-        if (!user) {
+        if (!user || !supabase) {
             setError("Sesi Anda berakhir, silakan login kembali.");
             return;
         }
         setLoading(true);
         setError('');
 
+        const currentStepNumber = step;
+
         const dataToSave = {
             ...formData,
             slug: `${formData.slug}.arumaja.id`,
             user_id: user.id,
             status: 'draft',
-            theme_id: null,
+            last_completed_step: currentStepNumber,
         };
 
         let success = false;
@@ -166,7 +180,7 @@ export default function InvitationForm({ setActiveView, invitationId }: { setAct
     };
     
     const saveEditChanges = async () => {
-        if (!user || !currentInvitationId) {
+        if (!user || !currentInvitationId || !supabase) {
             setError("Terjadi kesalahan, ID undangan tidak ditemukan.");
             return;
         }
@@ -192,7 +206,6 @@ export default function InvitationForm({ setActiveView, invitationId }: { setAct
         }
     }
 
-    // FUNGSI BARU UNTUK MEMPROSES PEMBAYARAN
     const handlePayment = async () => {
         if (!currentInvitationId) {
             setError("ID Undangan tidak ditemukan. Silakan coba lagi.");
@@ -217,9 +230,8 @@ export default function InvitationForm({ setActiveView, invitationId }: { setAct
                 throw new Error(data.error || 'Gagal membuat transaksi.');
             }
             
-            // Handle paket gratis (Bronze)
             if (data.free_package) {
-                alert('Selamat! Undangan Anda telah berhasil dipublikasikan.');
+                alert('Selamat! Undangan Anda telah berhasil diaktifkan.');
                  if (setActiveView) {
                     setActiveView('dashboard');
                 } else {
@@ -228,18 +240,19 @@ export default function InvitationForm({ setActiveView, invitationId }: { setAct
                 return;
             }
 
-            // Jika ada token, buka popup pembayaran Midtrans Snap
             if (data.token) {
                 window.snap.pay(data.token, {
                     onSuccess: function(result: any){
                         console.log('success', result);
-                        alert("Pembayaran berhasil! Undangan Anda akan segera dipublikasikan.");
-                        router.push('/dashboard');
+                        alert("Pembayaran berhasil! Undangan Anda kini telah aktif.");
+                        if (setActiveView) setActiveView('dashboard');
+                        else router.push('/dashboard');
                     },
                     onPending: function(result: any){
                         console.log('pending', result);
                         alert("Menunggu pembayaran Anda. Anda akan dinotifikasi jika sudah berhasil.");
-                        router.push('/dashboard');
+                        if (setActiveView) setActiveView('dashboard');
+                        else router.push('/dashboard');
                     },
                     onError: function(result: any){
                         console.log('error', result);
@@ -247,7 +260,6 @@ export default function InvitationForm({ setActiveView, invitationId }: { setAct
                     },
                     onClose: function(){
                         console.log('Popup pembayaran ditutup tanpa menyelesaikan transaksi.');
-                        setError('Anda menutup jendela pembayaran sebelum selesai.');
                     }
                 });
             }
@@ -279,6 +291,11 @@ export default function InvitationForm({ setActiveView, invitationId }: { setAct
         setFormData(prev => ({ ...prev, package: packageName }));
     };
 
+    // Tampilkan loading jika sedang mengambil data
+    if (loading && invitationId) {
+        return <div className="text-center p-8">Memuat data undangan...</div>;
+    }
+
     return (
         <div className="bg-white p-4 sm:p-8 rounded-lg border border-brand-gold/30 shadow-sm max-w-3xl mx-auto">
             <ConfirmationModal 
@@ -286,7 +303,6 @@ export default function InvitationForm({ setActiveView, invitationId }: { setAct
                 onClose={() => setConfirmModalOpen(false)}
                 onConfirm={() => {
                     setConfirmModalOpen(false);
-                    // Langsung ke pembayaran, tidak lagi ke step 4
                     handlePayment(); 
                 }}
                 data={formData}
@@ -295,31 +311,33 @@ export default function InvitationForm({ setActiveView, invitationId }: { setAct
             <Stepper currentStep={step} steps={formSteps} />
             <div className="mt-8">
                 {error && <p className="text-red-600 text-sm mb-4 text-center">{error}</p>}
-                {isEditMode ? (
+                
+                {/* --- PERUBAHAN UTAMA: Struktur Kondisional --- */}
+                {/* Tampilkan alur lengkap jika MEMBUAT BARU atau MELANJUTKAN DRAF */}
+                {(isCreatingNew || isResumingDraft) && (
                     <>
-                        {step === 1 && <Step1Mulai formData={formData} handleChange={handleChange} onNext={() => saveDraftAndProceed(2)} onCancel={onCancel} isEditMode slugStatus={slugStatus} slugError={slugError} loading={loading} />}
-                        {step === 2 && <Step2Lokasi formData={formData} onLocationChange={handleLocationChange} onBack={handleBack} onSubmit={saveEditChanges} loading={loading} />}
-                    </>
-                ) : (
-                    <>
-                        {step === 1 && <Step1Mulai formData={formData} handleChange={handleChange} onNext={() => saveDraftAndProceed(2)} onCancel={onCancel} slugStatus={slugStatus} slugError={slugError} loading={loading} />}
+                        {step === 1 && <Step1Mulai formData={formData} handleChange={handleChange} onNext={() => saveDraftAndProceed(2)} onCancel={onCancel} isEditMode={!!invitationId} slugStatus={slugStatus} slugError={slugError} loading={loading} />}
                         {step === 2 && <Step2Lokasi formData={formData} onLocationChange={handleLocationChange} onBack={handleBack} onNext={() => saveDraftAndProceed(3)} isCreateMode loading={loading} />}
-                        
-                        {/* Ganti onNext agar memanggil handlePayment jika paket Bronze, atau buka modal jika berbayar */}
                         {step === 3 && <Step4Paket 
                             selectedPackage={formData.package} 
                             onSelect={handlePackageSelect} 
                             onBack={handleBack} 
                             onNext={() => {
                                 if (formData.package === 'bronze') {
-                                    handlePayment(); // Langsung proses jika gratis
+                                    handlePayment();
                                 } else {
-                                    setConfirmModalOpen(true); // Tampilkan modal jika berbayar
+                                    setConfirmModalOpen(true);
                                 }
                             }} 
                         />}
+                    </>
+                )}
 
-                        {/* Step 4 (Pembayaran) sekarang dikelola oleh handlePayment, jadi tidak perlu dirender */}
+                {/* Tampilkan alur singkat HANYA JIKA MENGEDIT UNDANGAN YANG SUDAH PAID */}
+                {isEditingPaid && (
+                     <>
+                        {step === 1 && <Step1Mulai formData={formData} handleChange={handleChange} onNext={() => setStep(2)} onCancel={onCancel} isEditMode slugStatus={slugStatus} slugError={slugError} loading={loading} />}
+                        {step === 2 && <Step2Lokasi formData={formData} onLocationChange={handleLocationChange} onBack={handleBack} onSubmit={saveEditChanges} loading={loading} />}
                     </>
                 )}
             </div>
@@ -327,32 +345,32 @@ export default function InvitationForm({ setActiveView, invitationId }: { setAct
     );
 }
 
-// --- Komponen-komponen Step ---
+// Komponen Step1Mulai
 function Step1Mulai({ formData, handleChange, onNext, onCancel, isEditMode = false, slugStatus, slugError, loading }: { formData: Partial<FormData>, handleChange: any, onNext: () => void, onCancel: () => void, isEditMode?: boolean, slugStatus: SlugStatus, slugError: string, loading?: boolean }) {
     const isSlugValid = formData.slug && formData.slug.length > 2;
     const canProceed = formData.bride_name && formData.groom_name && formData.event_name && formData.slug && formData.event_date && (slugStatus === 'available');
-    const isSlugDisabled = isEditMode && formData.status === 'published';
+    const isSlugDisabled = formData.status === 'paid';
     return (
         <div>
-            <h2 className="text-2xl md:text-3xl font-serif font-bold text-brand-green">{isEditMode ? 'Edit Undangan Anda' : "Mulai Buat Undangan"}</h2>
-            <p className="text-brand-charcoal/80 mt-2">{isEditMode ? 'Ubah detail undangan Anda.' : 'Isi detail dasar undangan Anda.'}</p>
+            <h2 className="text-2xl md:text-3xl font-serif font-bold text-brand-green">{formData.status === 'paid' ? 'Edit Detail Undangan' : "Mulai Buat Undangan"}</h2>
+            <p className="text-brand-charcoal/80 mt-2">{formData.status === 'paid' ? 'Ubah detail dasar undangan Anda.' : 'Isi detail dasar undangan Anda.'}</p>
             <div className="mt-8 space-y-6">
                 <fieldset>
                     <legend className="font-semibold text-lg mb-4 text-brand-charcoal">Informasi Mempelai</legend>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <input type="text" name="bride_name" value={formData.bride_name} onChange={handleChange} placeholder="Nama Mempelai Wanita" className="w-full p-3 border-b-2 border-brand-champagne focus:border-brand-gold outline-none" required />
-                        <input type="text" name="groom_name" value={formData.groom_name} onChange={handleChange} placeholder="Nama Mempelai Pria" className="w-full p-3 border-b-2 border-brand-champagne focus:border-brand-gold outline-none" required />
+                        <input type="text" name="bride_name" value={formData.bride_name || ''} onChange={handleChange} placeholder="Nama Mempelai Wanita" className="w-full p-3 border-b-2 border-brand-champagne focus:border-brand-gold outline-none" required />
+                        <input type="text" name="groom_name" value={formData.groom_name || ''} onChange={handleChange} placeholder="Nama Mempelai Pria" className="w-full p-3 border-b-2 border-brand-champagne focus:border-brand-gold outline-none" required />
                     </div>
                 </fieldset>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                        <label className="font-semibold text-brand-charcoal">Judul Undangan</label>
-                       <input type="text" name="event_name" value={formData.event_name} onChange={handleChange} className="w-full mt-1 p-3 border-b-2 border-brand-champagne focus:border-brand-gold outline-none" required />
+                       <input type="text" name="event_name" value={formData.event_name || ''} onChange={handleChange} className="w-full mt-1 p-3 border-b-2 border-brand-champagne focus:border-brand-gold outline-none" required />
                     </div>
                      <div>
                        <label className="font-semibold text-brand-charcoal">URL Undangan</label>
-                       <div className="flex items-center mt-1 border-b-2 border-brand-champagne focus-within:border-brand-gold">
-                           <input type="text" name="slug" value={formData.slug} onChange={handleChange} className="w-full p-3 outline-none disabled:bg-gray-100" required disabled={isSlugDisabled} />
+                       <div className={`flex items-center mt-1 border-b-2 border-brand-champagne focus-within:border-brand-gold ${isSlugDisabled ? 'bg-gray-100' : ''}`}>
+                           <input type="text" name="slug" value={formData.slug || ''} onChange={handleChange} className="w-full p-3 outline-none bg-transparent disabled:cursor-not-allowed" required disabled={isSlugDisabled} />
                            <span className="text-gray-500 pr-3">.arumaja.id</span>
                        </div>
                        <div className="h-5 mt-1 text-sm">
@@ -362,7 +380,7 @@ function Step1Mulai({ formData, handleChange, onNext, onCancel, isEditMode = fal
                 </div>
                 <div>
                    <label className="font-semibold text-brand-charcoal">Tanggal Acara</label>
-                   <input type="date" name="event_date" value={formData.event_date} onChange={handleChange} className="w-full p-3 mt-2 bg-brand-champagne border border-brand-gold/50 rounded-lg" required />
+                   <input type="date" name="event_date" value={formData.event_date || ''} onChange={handleChange} className="w-full p-3 mt-2 bg-brand-champagne border border-brand-gold/50 rounded-lg" required />
                 </div>
             </div>
              <div className="flex justify-end gap-4 mt-8">
@@ -374,10 +392,12 @@ function Step1Mulai({ formData, handleChange, onNext, onCancel, isEditMode = fal
         </div>
     );
 }
+
+// Komponen Step2Lokasi
 function Step2Lokasi({ formData, onLocationChange, onBack, onNext, onSubmit, loading, isCreateMode = false }: { formData: Partial<FormData>, onLocationChange: (location: { address: string; lat: number; lng: number }) => void, onBack: () => void, onNext?: () => void, onSubmit?: () => void, loading?: boolean, isCreateMode?: boolean }) {
     return (
         <div>
-            <h2 className="text-2xl font-serif font-bold text-brand-green">Langkah 2: Tentukan Lokasi Acara</h2>
+            <h2 className="text-2xl font-serif font-bold text-brand-green">Tentukan Lokasi Acara</h2>
             <p className="mt-2 text-brand-charcoal/80">Pilih lokasi utama acara pernikahan Anda.</p>
             <div className="mt-8 space-y-6">
                 <LocationPicker onLocationChange={onLocationChange} />
@@ -385,20 +405,27 @@ function Step2Lokasi({ formData, onLocationChange, onBack, onNext, onSubmit, loa
             </div>
             <div className="flex justify-end gap-4 mt-8">
                 <button type="button" onClick={onBack} className="px-6 py-2 text-sm font-semibold text-brand-charcoal rounded-md hover:bg-brand-champagne">Kembali</button>
-                {isCreateMode ? <button type="button" onClick={onNext} disabled={!formData.location || loading} className="px-8 py-2 font-bold text-white bg-brand-green rounded-md hover:opacity-90 disabled:bg-gray-400">{loading ? 'Menyimpan...' : 'Lanjutkan'}</button> : <button type="button" onClick={onSubmit} disabled={loading} className="px-8 py-2 font-bold text-brand-green bg-brand-gold rounded-md hover:opacity-90 disabled:bg-gray-400">{loading ? 'Menyimpan...' : 'Simpan Perubahan'}</button>}
+                {/* Tampilkan tombol yang sesuai: Lanjutkan untuk alur pembuatan, Simpan untuk mode edit */}
+                {(onNext && isCreateMode) ? 
+                    <button type="button" onClick={onNext} disabled={!formData.location || loading} className="px-8 py-2 font-bold text-white bg-brand-green rounded-md hover:opacity-90 disabled:bg-gray-400">{loading ? 'Menyimpan...' : 'Lanjutkan'}</button> 
+                    : 
+                    <button type="button" onClick={onSubmit} disabled={loading} className="px-8 py-2 font-bold text-brand-green bg-brand-gold rounded-md hover:opacity-90 disabled:bg-gray-400">{loading ? 'Menyimpan...' : 'Simpan Perubahan'}</button>
+                }
             </div>
         </div>
     );
 }
+
+// Komponen Step4Paket
 function Step4Paket({ selectedPackage, onSelect, onBack, onNext }: { selectedPackage: string, onSelect: (pkg: string) => void, onBack: () => void, onNext: () => void }) {
     const packages = [
         { name: 'bronze', title: 'Bronze', price: 'Gratis', features: ['Desain Standar', 'Hitung Mundur Acara', '1 Admin'] },
         { name: 'silver', title: 'Silver', price: 'Rp 99.000', features: ['Semua di Bronze', '+ Desain Premium', '+ Galeri Foto', '+ Musik Latar'] },
-        { name: 'gold', title: 'Gold', price: 'Rp 149.000', features: ['Semua di Silver', '+ Custom Domain', '+ Amplop Digital', '+ 5 Admin'] },
+        { name: 'gold', title: 'Gold', price: 'Rp 149.000', features: ['Semua di Silver', '+ Amplop Digital', '+ 5 Admin'] },
     ];
     return (
         <div>
-            <h2 className="text-2xl font-serif font-bold text-brand-green">Langkah 3: Pilih Paket</h2>
+            <h2 className="text-2xl font-serif font-bold text-brand-green">Pilih Paket</h2>
             <p className="mt-2 text-brand-charcoal/80">Pilih paket yang paling sesuai.</p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
                 {packages.map(pkg => (
@@ -413,7 +440,7 @@ function Step4Paket({ selectedPackage, onSelect, onBack, onNext }: { selectedPac
             </div>
             <div className="flex justify-end gap-4 mt-8">
                 <button type="button" onClick={onBack} className="px-6 py-2 text-sm font-semibold text-brand-charcoal rounded-md hover:bg-brand-champagne">Kembali</button>
-                <button type="button" onClick={onNext} className="px-8 py-2 font-bold text-white bg-brand-green rounded-md hover:opacity-90">Lanjutkan</button>
+                <button type="button" onClick={onNext} className="px-8 py-2 font-bold text-white bg-brand-green rounded-md hover:opacity-90">Lanjutkan ke Pembayaran</button>
             </div>
         </div>
     );

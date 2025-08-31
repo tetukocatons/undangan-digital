@@ -38,9 +38,10 @@ export default function DashboardPage() {
 
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
-  const [managedInvitationId, setManagedInvitationId] = useState<string | null>(null);
+  const [activeInvitationId, setActiveInvitationId] = useState<string | null>(null);
 
   const fetchInvitations = useCallback(async () => {
+    if (!supabase) return;
     setIsLoadingData(true);
     const { data, error } = await supabase
         .from('events')
@@ -53,12 +54,9 @@ export default function DashboardPage() {
     } else {
         const fetchedInvitations = data as Invitation[];
         setInvitations(fetchedInvitations);
-        if (!managedInvitationId && fetchedInvitations.length > 0) {
-            setManagedInvitationId(fetchedInvitations[0].id);
-        }
     }
     setIsLoadingData(false);
-  }, [supabase, managedInvitationId]);
+  }, [supabase]);
 
   useEffect(() => {
     fetchInvitations();
@@ -69,15 +67,21 @@ export default function DashboardPage() {
   };
   
   const handleManageInvitation = (invitationId: string) => {
-    setManagedInvitationId(invitationId);
+    setActiveInvitationId(invitationId);
     setActiveView('manage-invitation');
   };
   
-  const handleSetView = (view: string) => {
-      // Saat pindah ke menu "Undangan", pastikan ID default sudah siap
-      if (view === 'manage-invitation' && !managedInvitationId && invitations.length > 0) {
-          setManagedInvitationId(invitations[0].id);
+  const handleSetView = (view: string, id?: string) => {
+      if (view === 'manage-invitation' && !activeInvitationId && invitations.length > 0) {
+          setActiveInvitationId(invitations[0].id);
       }
+      
+      if (id) {
+          setActiveInvitationId(id);
+      } else if (view === 'create-invitation') {
+          setActiveInvitationId(null);
+      }
+
       setActiveView(view);
   }
 
@@ -96,8 +100,8 @@ export default function DashboardPage() {
                   invitations={invitations}
                   isLoading={isLoadingData}
                   refreshInvitations={fetchInvitations}
-                  managedInvitationId={managedInvitationId}
-                  onInvitationChange={setManagedInvitationId}
+                  managedInvitationId={activeInvitationId}
+                  onInvitationChange={setActiveInvitationId}
                />;
       case 'guest-management':
         return <GuestManagementView
@@ -108,7 +112,10 @@ export default function DashboardPage() {
       case 'help': return <HelpView />;
       case 'account': return <AccountSettings />;
       case 'create-invitation':
-        return <InvitationForm setActiveView={() => { fetchInvitations(); handleSetView('dashboard'); }} />;
+        return <InvitationForm 
+                 setActiveView={(view) => { fetchInvitations(); handleSetView(view); }} 
+                 invitationId={activeInvitationId || undefined} 
+               />;
       default:
         return <div className="p-6">Selamat Datang!</div>;
     }

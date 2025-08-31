@@ -15,7 +15,7 @@ type Invitation = {
     location: string;
     latitude: number | null;
     longitude: number | null;
-    status: string; // Tambahkan status untuk logika penguncian URL
+    status: string;
 };
 
 type InvitationDetailsFormProps = {
@@ -40,12 +40,12 @@ export default function InvitationDetailsForm({ invitation, onUpdate }: Invitati
         const initialData = { ...invitation, slug: slugPart, event_date: eventDate };
         setFormData(initialData);
         setInitialSlug(slugPart);
-        setSlugStatus('available'); // Set status awal slug sebagai tersedia
+        setSlugStatus('available');
     }, [invitation]);
 
-    // Hook untuk validasi slug secara real-time
     useEffect(() => {
         const handler = setTimeout(async () => {
+            if(!supabase) return;
             const slug = formData.slug;
             if (slug === initialSlug) {
                 setSlugStatus('available'); return;
@@ -89,6 +89,7 @@ export default function InvitationDetailsForm({ invitation, onUpdate }: Invitati
             alert('URL undangan tidak tersedia. Silakan ganti dengan yang lain.');
             return;
         }
+        if(!supabase) return;
         setSaving(true);
         setMessage('');
         
@@ -107,7 +108,7 @@ export default function InvitationDetailsForm({ invitation, onUpdate }: Invitati
         setTimeout(() => setMessage(''), 3000);
     };
 
-    const isUrlLocked = invitation.status === 'published';
+    const isUrlLocked = invitation.status === 'paid';
 
     return (
         <div className="space-y-8">
@@ -141,7 +142,7 @@ export default function InvitationDetailsForm({ invitation, onUpdate }: Invitati
                            <span className={`pr-3 ${isUrlLocked ? 'text-gray-400' : 'text-gray-500'}`}>.arumaja.id</span>
                        </div>
                        <div className="h-5 mt-1 text-sm">
-                           {isUrlLocked ? <p className="text-gray-500">URL tidak dapat diubah setelah undangan dipublikasikan.</p> : <> {slugStatus === 'checking' && <p className="text-gray-500">Mengecek...</p>} {slugStatus === 'unavailable' && <p className="text-red-500">{slugError}</p>} {slugStatus === 'available' && formData.slug.length > 2 && <p className="text-green-600">URL tersedia!</p>} </>}
+                           {isUrlLocked ? <p className="text-gray-500">URL tidak dapat diubah setelah undangan dibayar.</p> : <> {slugStatus === 'checking' && <p className="text-gray-500">Mengecek...</p>} {slugStatus === 'unavailable' && <p className="text-red-500">{slugError}</p>} {slugStatus === 'available' && formData.slug.length > 2 && <p className="text-green-600">URL tersedia!</p>} </>}
                        </div>
                     </div>
                 </div>
