@@ -13,6 +13,7 @@ import InvitationManagementView from '@/components/dashboard/InvitationManagemen
 import GuestManagementView from '@/components/dashboard/GuestManagementView';
 import { SupabaseClient } from '@supabase/supabase-js';
 
+// ... (Komponen MenuIcon, SettingsView, HelpView, dan tipe Invitation tetap sama) ...
 const MenuIcon = ({ className = "w-6 h-6" }) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24" strokeWidth={1.5} stroke="currentColor" className={className}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
@@ -22,13 +23,34 @@ const MenuIcon = ({ className = "w-6 h-6" }) => (
 const SettingsView = () => <div className="p-6"><h1 className="font-serif text-3xl font-bold text-brand-green">Pengaturan</h1><p>Halaman untuk pengaturan umum akan tersedia di sini.</p></div>;
 const HelpView = () => <div className="p-6"><h1 className="font-serif text-3xl font-bold text-brand-green">Bantuan</h1><p>Halaman pusat bantuan dan FAQ akan tersedia di sini.</p></div>;
 
-type Invitation = {
-  id: string; event_name: string; event_date: string; status: string; slug: string;
-  package: string; theme_id: string | null; bride_name: string; groom_name: string;
-  location: string; latitude: number | null; longitude: number | null;
-  couple_enabled: boolean; story_enabled: boolean; gallery_enabled: boolean;
-  acara_enabled: boolean; gift_enabled: boolean;
+export type Invitation = {
+  id: string;
+  event_name: string;
+  event_date: string;
+  status: string;
+  slug: string;
+  package: string;
+  theme_id: string | null;
+  bride_name: string;
+  groom_name: string;
+  location: string;
+  latitude: number | null;
+  longitude: number | null;
+  couple_enabled: boolean;
+  story_enabled: boolean;
+  gallery_enabled: boolean;
+  acara_enabled: boolean;
+  gift_enabled: boolean;
+  valid_to: string | null;
 };
+
+// --- KOMPONEN BARU UNTUK BANNER ADMIN ---
+const AdminBanner = ({ role }: { role: string }) => (
+  <div className="bg-yellow-400 text-yellow-900 text-center p-2 font-semibold text-sm w-full">
+    Anda login sebagai: <span className="font-bold capitalize">{role}</span>
+  </div>
+);
+
 
 export default function DashboardPage() {
   const { user, profile, isLoading: isAuthLoading, supabase } = useAuth();
@@ -71,9 +93,14 @@ export default function DashboardPage() {
     setActiveView('manage-invitation');
   };
   
-  const handleSetView = (view: string, id?: string) => {
+  const handleSetView = async (view: string, id?: string) => {
+      if (view === 'dashboard') {
+          await fetchInvitations();
+      }
+      
       if (view === 'manage-invitation' && !activeInvitationId && invitations.length > 0) {
-          setActiveInvitationId(invitations[0].id);
+          const firstPaid = invitations.find(inv => inv.status === 'paid');
+          setActiveInvitationId(firstPaid ? firstPaid.id : invitations[0].id);
       }
       
       if (id) {
@@ -86,6 +113,7 @@ export default function DashboardPage() {
   }
 
   const renderContent = () => {
+    // ... (Isi switch case tetap sama)
     switch (activeView) {
       case 'dashboard':
         return <InvitationsView 
@@ -102,6 +130,7 @@ export default function DashboardPage() {
                   refreshInvitations={fetchInvitations}
                   managedInvitationId={activeInvitationId}
                   onInvitationChange={setActiveInvitationId}
+                  setActiveView={handleSetView}
                />;
       case 'guest-management':
         return <GuestManagementView
@@ -113,7 +142,7 @@ export default function DashboardPage() {
       case 'account': return <AccountSettings />;
       case 'create-invitation':
         return <InvitationForm 
-                 setActiveView={(view) => { fetchInvitations(); handleSetView(view); }} 
+                 setActiveView={(view, id) => { fetchInvitations().then(() => handleSetView(view, id)); }} 
                  invitationId={activeInvitationId || undefined} 
                />;
       default:
@@ -127,6 +156,9 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-brand-champagne">
+      {/* --- BANNER DITAMPILKAN SECARA KONDISIONAL DI SINI --- */}
+      {profile && profile.role !== 'customer' && <AdminBanner role={profile.role} />}
+      
       <div className="flex">
         <Sidebar 
             activeView={activeView} 
@@ -135,14 +167,17 @@ export default function DashboardPage() {
             profile={profile}
             isOpen={isSidebarOpen}
             toggle={() => setSidebarOpen(!isSidebarOpen)}
+            invitations={invitations}
         />
-        <main className="flex-1">
-            <div className="md:hidden bg-brand-green text-white p-4 flex items-center shadow-md">
-                <button onClick={() => setSidebarOpen(true)}><MenuIcon /></button>
-                <h1 className="font-serif text-xl font-bold ml-4">Dashboard</h1>
-            </div>
+        <div className="flex-1 flex flex-col h-screen">
+          <header className="md:hidden bg-brand-green text-white p-4 flex items-center shadow-md sticky top-0 z-20">
+              <button onClick={() => setSidebarOpen(true)}><MenuIcon /></button>
+              <h1 className="font-serif text-xl font-bold ml-4">Dashboard</h1>
+          </header>
+          <main className="flex-1 overflow-y-auto">
             <div className="p-4 sm:p-6">{renderContent()}</div>
-        </main>
+          </main>
+        </div>
       </div>
     </div>
   );

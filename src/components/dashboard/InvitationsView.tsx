@@ -5,15 +5,7 @@ import React, { useState } from 'react';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-
-type Invitation = {
-  id: string;
-  event_name: string;
-  event_date: string;
-  status: string;
-  slug: string;
-  package: string; 
-};
+import { Invitation } from '@/app/(app)/dashboard/page';
 
 type InvitationsViewProps = {
   invitations: Invitation[];
@@ -63,6 +55,15 @@ export default function InvitationsView({ invitations, isLoading, refreshInvitat
         setDeleteLoading(false);
     };
 
+    const formatDate = (dateString: string | null) => {
+        if (!dateString) return '-';
+        return new Date(dateString).toLocaleDateString('id-ID', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+        });
+    };
+
     return (
         <div className="space-y-6">
             <DeleteConfirmationModal 
@@ -80,12 +81,12 @@ export default function InvitationsView({ invitations, isLoading, refreshInvitat
                     <div className="text-center p-6 text-brand-charcoal/80">Memuat data...</div>
                 ) : invitations.length > 0 ? (
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left">
+                        <table className="w-full text-left min-w-[768px]">
                             <thead>
                                 <tr className="border-b-2 border-brand-champagne">
                                     <th className="p-3 text-sm font-semibold uppercase text-brand-charcoal/60">Nama Acara</th>
-                                    <th className="p-3 text-sm font-semibold uppercase text-brand-charcoal/60">Tanggal</th>
-                                    <th className="p-3 text-sm font-semibold uppercase text-brand-charcoal/60">Paket</th>
+                                    <th className="p-3 text-sm font-semibold uppercase text-brand-charcoal/60">Tanggal Acara</th>
+                                    <th className="p-3 text-sm font-semibold uppercase text-brand-charcoal/60">Masa Berlaku</th>
                                     <th className="p-3 text-sm font-semibold uppercase text-brand-charcoal/60">Status</th>
                                     <th className="p-3 text-sm font-semibold uppercase text-brand-charcoal/60 text-center">Aksi</th>
                                 </tr>
@@ -93,15 +94,11 @@ export default function InvitationsView({ invitations, isLoading, refreshInvitat
                             <tbody>
                                 {invitations.map(inv => (
                                     <tr key={inv.id} className="border-b border-brand-champagne hover:bg-brand-champagne/50">
-                                        <td className="p-3 font-semibold">{inv.event_name}</td>
-                                        <td className="p-3">{new Date(inv.event_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</td>
+                                        <td className="p-3 font-semibold text-brand-green">{inv.event_name}</td>
+                                        <td className="p-3">{formatDate(inv.event_date)}</td>
+                                        <td className="p-3 font-medium text-gray-700">{formatDate(inv.valid_to)}</td>
                                         <td className="p-3">
-                                            <span className="capitalize font-medium text-brand-green bg-brand-gold/20 py-1 px-2 rounded-md text-xs">
-                                                {inv.package || 'N/A'}
-                                            </span>
-                                        </td>
-                                        <td className="p-3">
-                                            <span className={`capitalize px-2 py-1 text-xs font-semibold rounded-full ${inv.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                                            <span className={`capitalize px-2.5 py-1 text-xs font-semibold rounded-full ${inv.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
                                                 {inv.status}
                                             </span>
                                         </td>

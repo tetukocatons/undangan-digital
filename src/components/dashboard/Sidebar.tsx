@@ -2,24 +2,26 @@
 'use client';
 
 import { UserProfile } from '@/contexts/AuthContext';
+import { Invitation } from '@/app/(app)/dashboard/page';
 
 type SidebarProps = {
   activeView: string;
-  setActiveView: (view: string) => void;
+  // Perbarui tipe untuk menerima fungsi async
+  setActiveView: (view: string) => Promise<void> | void; 
   onLogout: () => void;
   profile: UserProfile | null;
   isOpen: boolean;
   toggle: () => void;
+  invitations: Invitation[];
 };
 
-// --- PERUBAHAN MENU SIDEBAR ---
 const menu = [
-  { id: 'dashboard', name: 'Dashboard' },
-  { id: 'manage-invitation', name: 'Undangan' },
-  { id: 'guest-management', name: 'Tamu & RSVP' },
-  { id: 'settings', name: 'Pengaturan' },
-  { id: 'help', name: 'Bantuan' },
-  { id: 'account', name: 'Akun Saya' },
+  { id: 'dashboard', name: 'Dashboard', requiresPaid: false },
+  { id: 'manage-invitation', name: 'Undangan', requiresPaid: true },
+  { id: 'guest-management', name: 'Tamu & RSVP', requiresPaid: true },
+  { id: 'settings', name: 'Pengaturan', requiresPaid: false },
+  { id: 'help', name: 'Bantuan', requiresPaid: false },
+  { id: 'account', name: 'Akun Saya', requiresPaid: false },
 ];
 
 const adminMenu = [
@@ -27,9 +29,16 @@ const adminMenu = [
     { id: 'theme-management', name: 'Manajemen Tema', roles: ['administrator', 'staff'] },
 ];
 
-export default function Sidebar({ activeView, setActiveView, onLogout, profile, isOpen, toggle }: SidebarProps) {
+export default function Sidebar({ activeView, setActiveView, onLogout, profile, isOpen, toggle, invitations }: SidebarProps) {
   
-  const handleItemClick = (view: string) => {
+  const hasPaidInvitation = invitations.some(inv => inv.status === 'paid');
+
+  const handleItemClick = (view: string, requiresPaid: boolean) => {
+    if (requiresPaid && !hasPaidInvitation) {
+      alert('Harap selesaikan pembuatan dan pembayaran undangan Anda terlebih dahulu untuk mengakses menu ini.');
+      return;
+    }
+
     setActiveView(view);
     if (isOpen) {
       toggle();
@@ -42,18 +51,25 @@ export default function Sidebar({ activeView, setActiveView, onLogout, profile, 
         Arumaja<span className="text-brand-gold">.</span>
       </h2>
       <nav className="space-y-2 flex-grow">
-        {menu.map(item => (
-          <button
-            key={item.id}
-            onClick={() => handleItemClick(item.id)}
-            className={
-              'w-full text-left px-4 py-2 rounded-lg transition-colors ' +
-              (activeView === item.id ? 'bg-brand-off-white/10 text-brand-gold' : 'hover:text-brand-gold')
-            }
-          >
-            • {item.name}
-          </button>
-        ))}
+        {menu.map(item => {
+          const isDisabled = item.requiresPaid && !hasPaidInvitation;
+          return (
+            <button
+              key={item.id}
+              onClick={() => handleItemClick(item.id, item.requiresPaid)}
+              disabled={isDisabled}
+              className={
+                'w-full text-left px-4 py-2 rounded-lg transition-colors ' +
+                (activeView === item.id ? 'bg-brand-off-white/10 text-brand-gold font-semibold' : 'hover:text-brand-gold ') +
+                (isDisabled ? 'opacity-50 cursor-not-allowed' : '')
+              }
+              title={isDisabled ? 'Selesaikan pembuatan undangan terlebih dahulu' : ''}
+            >
+              • {item.name}
+            </button>
+          );
+        })}
+        
         {profile && (profile.role === 'administrator' || profile.role === 'staff') && (
         <div className="mt-4 pt-4 border-t border-white/10">
             <p className="px-4 pb-2 text-sm font-semibold text-brand-off-white/50 uppercase tracking-wider">Admin Panel</p>
@@ -61,10 +77,10 @@ export default function Sidebar({ activeView, setActiveView, onLogout, profile, 
                 item.roles.includes(profile.role) && (
                     <button
                         key={item.id}
-                        onClick={() => handleItemClick(item.id)}
+                        onClick={() => handleItemClick(item.id, false)}
                         className={
                           'w-full text-left px-4 py-2 rounded-lg transition-colors ' +
-                          (activeView === item.id ? 'bg-brand-off-white/10 text-brand-gold' : 'hover:text-brand-gold')
+                          (activeView === item.id ? 'bg-brand-off-white/10 text-brand-gold font-semibold' : 'hover:text-brand-gold')
                         }
                     >
                         • {item.name}
