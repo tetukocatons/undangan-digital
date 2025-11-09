@@ -6,16 +6,7 @@ import ThemeSelector from './ThemeSelector';
 import FeatureManagement from './FeatureManagement';
 import InvitationDetailsForm from './InvitationDetailsForm';
 import GiftManagement from './GiftManagement'; // <-- Impor komponen baru untuk Hadiah
-import { Invitation } from '@/app/(app)/dashboard/page'; // Impor tipe dari page
-
-type InvitationManagementViewProps = {
-    invitations: Invitation[];
-    isLoading: boolean;
-    refreshInvitations: () => void;
-    managedInvitationId: string | null; 
-    onInvitationChange: (id: string) => void;
-    setActiveView: (view: string, id?: string) => void;
-};
+import { Invitation } from '@/lib/types';
 
 // Komponen Notifikasi untuk Undangan Draft
 const DraftNotification = ({ invitationId, setActiveView }: { invitationId: string, setActiveView: (view: string, id?: string) => void }) => (

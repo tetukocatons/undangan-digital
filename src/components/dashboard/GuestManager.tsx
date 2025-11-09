@@ -3,26 +3,17 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-
-type Guest = {
-  id: string;
-  name: string;
-  phone: string | null;
-  event_id: string;
-  rsvp_status: 'Pending' | 'Confirmed' | 'Declined';
-  attendance_count: number;
-  qr_code_id: string | null;
-};
+import { PostgrestError } from '@supabase/supabase-js'; // Import tipe Error
+import { Guest, GuestRsvpStatus } from '@/lib/types';
 
 type GuestManagerProps = {
   eventId: string;
   eventName: string | null;
 };
-
-// --- Icon Components ---
 const SendIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>;
 const TrashIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>;
 const QrCodeIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /><path d="M3 10h18M3 14h18" /></svg>;
+// ---
 
 export default function GuestManager({ eventId, eventName }: GuestManagerProps) {
     const { supabase } = useAuth();
@@ -32,7 +23,8 @@ export default function GuestManager({ eventId, eventName }: GuestManagerProps) 
     const [formLoading, setFormLoading] = useState(false);
 
     const fetchGuests = useCallback(async () => {
-        if (!eventId) return;
+        // ... (fungsi ini sudah benar)
+        if (!eventId || !supabase) return;
         setLoading(true);
         const { data, error } = await supabase
             .from('guests')
@@ -53,40 +45,21 @@ export default function GuestManager({ eventId, eventName }: GuestManagerProps) 
         fetchGuests();
     }, [fetchGuests]);
 
-    // --- PERUBAIKAN: Logika Pengecekan Wajib Isi & Duplikasi ---
+    // --- PERBAIKAN: Logika Pengecekan Duplikasi ---
     const handleAddGuest = async (e: React.FormEvent) => {
         e.preventDefault();
-        // 1. Cek apakah nama dan No. WA sudah diisi
         if (!newGuest.name || !newGuest.phone) {
             alert('Nama Tamu dan No. WhatsApp wajib diisi.');
             return;
         }
+        if (!supabase) return; // Pastikan supabase ada
 
         setFormLoading(true);
 
         try {
             const trimmedPhone = newGuest.phone.trim();
             
-            // 2. Cek apakah nomor WA sudah ada untuk undangan ini
-            const { data: existingGuest, error: checkError } = await supabase
-                .from('guests')
-                .select('id')
-                .eq('event_id', eventId)
-                .eq('phone', trimmedPhone)
-                .maybeSingle(); // Hanya cari satu data
-
-            if (checkError) {
-                throw new Error(`Gagal memvalidasi tamu: ${checkError.message}`);
-            }
-
-            // 3. Jika data ditemukan, tampilkan notifikasi dan hentikan proses
-            if (existingGuest) {
-                alert('Tamu dengan No. WhatsApp tersebut sudah ada di dalam daftar.');
-                setFormLoading(false);
-                return; 
-            }
-
-            // 4. Jika aman, tambahkan tamu baru
+            // Hapus pengecekan 'select' manual. Langsung insert.
             const { error: insertError } = await supabase.from('guests').insert([{
                 name: newGuest.name.trim(),
                 phone: trimmedPhone,
@@ -94,11 +67,16 @@ export default function GuestManager({ eventId, eventName }: GuestManagerProps) 
             }]);
 
             if (insertError) {
-                throw new Error(`Gagal menambahkan tamu: ${insertError.message}`);
+                // Tangkap error spesifik dari unique constraint
+                if (insertError.code === '23505') { // Kode Postgres untuk "unique_violation"
+                    throw new Error('Tamu dengan No. WhatsApp tersebut sudah ada di dalam daftar.');
+                } else {
+                    throw new Error(`Gagal menambahkan tamu: ${insertError.message}`);
+                }
             }
 
             setNewGuest({ name: '', phone: '' });
-            await fetchGuests();
+            await fetchGuests(); // Refresh daftar tamu
 
         } catch (error: any) {
             alert(error.message);
@@ -107,7 +85,10 @@ export default function GuestManager({ eventId, eventName }: GuestManagerProps) 
         }
     };
     
+    // ... (sisa fungsi: handleDeleteGuest, handleRsvpChange, handleInputChange, showBarcode, dan JSX return) ...
+    // ... (Tidak perlu diubah) ...
     const handleDeleteGuest = async (guestId: string) => {
+        if (!supabase) return;
         if (confirm('Apakah Anda yakin ingin menghapus tamu ini?')) {
             const { error } = await supabase.from('guests').delete().eq('id', guestId);
             if (error) alert(`Gagal menghapus tamu: ${error.message}`);
@@ -116,6 +97,7 @@ export default function GuestManager({ eventId, eventName }: GuestManagerProps) 
     };
     
     const handleRsvpChange = async (guestId: string, newStatus: Guest['rsvp_status']) => {
+        if (!supabase) return;
         const { error } = await supabase
             .from('guests')
             .update({ rsvp_status: newStatus })
@@ -126,7 +108,6 @@ export default function GuestManager({ eventId, eventName }: GuestManagerProps) 
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
-        // Hanya izinkan angka untuk input 'phone'
         if (name === 'phone') {
             const numericValue = value.replace(/[^0-9]/g, '');
             setNewGuest(prev => ({ ...prev, [name]: numericValue }));
@@ -184,7 +165,7 @@ export default function GuestManager({ eventId, eventName }: GuestManagerProps) 
                                     <td className="p-3">
                                         <select 
                                             value={guest.rsvp_status} 
-                                            onChange={(e) => handleRsvpChange(guest.id, e.target.value as Guest['rsvp_status'])}
+                                            onChange={(e) => handleRsvpChange(guest.id, e.target.value as GuestRsvpStatus)}
                                             className="p-1 rounded-md bg-white border border-gray-300"
                                         >
                                             <option value="Pending">Pending</option>

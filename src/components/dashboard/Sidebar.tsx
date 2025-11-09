@@ -1,8 +1,7 @@
 // src/components/dashboard/Sidebar.tsx
 'use client';
 
-import { UserProfile } from '@/contexts/AuthContext';
-import { Invitation } from '@/app/(app)/dashboard/page';
+import { UserProfile, Invitation } from '@/lib/types';
 
 type SidebarProps = {
   activeView: string;

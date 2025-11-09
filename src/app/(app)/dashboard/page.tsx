@@ -12,6 +12,7 @@ import InvitationForm from '@/components/dashboard/InvitationForm';
 import InvitationManagementView from '@/components/dashboard/InvitationManagementView';
 import GuestManagementView from '@/components/dashboard/GuestManagementView';
 import { SupabaseClient } from '@supabase/supabase-js';
+import { Invitation } from '@/lib/types';
 
 // ... (Komponen MenuIcon, SettingsView, HelpView, dan tipe Invitation tetap sama) ...
 const MenuIcon = ({ className = "w-6 h-6" }) => (
@@ -22,27 +23,6 @@ const MenuIcon = ({ className = "w-6 h-6" }) => (
 
 const SettingsView = () => <div className="p-6"><h1 className="font-serif text-3xl font-bold text-brand-green">Pengaturan</h1><p>Halaman untuk pengaturan umum akan tersedia di sini.</p></div>;
 const HelpView = () => <div className="p-6"><h1 className="font-serif text-3xl font-bold text-brand-green">Bantuan</h1><p>Halaman pusat bantuan dan FAQ akan tersedia di sini.</p></div>;
-
-export type Invitation = {
-  id: string;
-  event_name: string;
-  event_date: string;
-  status: string;
-  slug: string;
-  package: string;
-  theme_id: string | null;
-  bride_name: string;
-  groom_name: string;
-  location: string;
-  latitude: number | null;
-  longitude: number | null;
-  couple_enabled: boolean;
-  story_enabled: boolean;
-  gallery_enabled: boolean;
-  acara_enabled: boolean;
-  gift_enabled: boolean;
-  valid_to: string | null;
-};
 
 // --- KOMPONEN BARU UNTUK BANNER ADMIN ---
 const AdminBanner = ({ role }: { role: string }) => (

@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Invitation } from '@/app/(app)/dashboard/page';
+import { Invitation } from '@/lib/types';
 
 type GiftData = {
   id?: string;

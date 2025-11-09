@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import midtransClient from 'midtrans-client';
+import { createHash } from 'crypto'; // <-- 1. Import crypto
 
 const snap = new midtransClient.Snap({
   isProduction: false,
@@ -14,14 +15,47 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// --- 2. Fungsi untuk validasi signature ---
+function validateSignature(orderId: string, statusCode: string, grossAmount: string, signatureKey: string) {
+    const serverKey = process.env.MIDTRANS_SERVER_KEY;
+    if (!serverKey) {
+        console.error('Webhook Error: MIDTRANS_SERVER_KEY is not set.');
+        return false;
+    }
+    
+    const hash = createHash('sha512');
+    const dataToHash = `${orderId}${statusCode}${grossAmount}${serverKey}`;
+    const calculatedSignature = hash.update(dataToHash).digest('hex');
+    
+    return calculatedSignature === signatureKey;
+}
+
 export async function POST(request: Request) {
   try {
     const notificationJson = await request.json();
-    const statusResponse = await snap.transaction.notification(notificationJson);
-    const orderId = statusResponse.order_id;
-    const transactionStatus = statusResponse.transaction_status;
-    const fraudStatus = statusResponse.fraud_status;
-    const grossAmount = statusResponse.gross_amount;
+
+    // --- 3. Lakukan validasi signature SEGERA ---
+    const { 
+        order_id: orderId, 
+        transaction_status: transactionStatus, 
+        fraud_status: fraudStatus,
+        gross_amount: grossAmount,
+        status_code: statusCode,
+        signature_key: signatureKey
+    } = notificationJson;
+
+    if (!orderId || !statusCode || !grossAmount || !signatureKey) {
+        return NextResponse.json({ status: 'error', message: 'Invalid notification data' }, { status: 400 });
+    }
+
+    const isValid = validateSignature(orderId, statusCode, grossAmount, signatureKey);
+    
+    if (!isValid) {
+        console.warn(`Webhook Warning: Invalid signature for order_id ${orderId}.`);
+        return NextResponse.json({ status: 'error', message: 'Invalid signature' }, { status: 403 });
+    }
+    // --- Akhir dari validasi signature ---
+
 
     const { data: transaction, error: findError } = await supabaseAdmin
       .from('transactions')
@@ -43,6 +77,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ status: 'ok', message: 'Transaction already processed as success' }, { status: 200 });
     }
 
+    // Gunakan transactionStatus dan fraudStatus dari data yang divalidasi
     if ((transactionStatus === 'capture' || transactionStatus === 'settlement') && fraudStatus === 'accept') {
       const { error: rpcError } = await supabaseAdmin.rpc('handle_successful_payment', {
         order_id_param: orderId

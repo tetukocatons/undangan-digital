@@ -91,7 +91,7 @@ const EventSection = ({
     const formattedDate = new Date(event_date).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
     
     // PERBAIKAN: Membuat URL Peta Dinamis
-    const mapSrc = `https://www.google.com/maps/embed/v1/place?key=MASUKKAN_API_KEY_ANDA&q=$${latitude},${longitude}`;
+    const mapSrc = `https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&q=${latitude},${longitude}`;
 
     return (
         <section id="event" className="py-20 px-4 bg-brand-off-white text-center">

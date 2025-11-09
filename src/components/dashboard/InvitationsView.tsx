@@ -5,15 +5,7 @@ import React, { useState } from 'react';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { Invitation } from '@/app/(app)/dashboard/page';
-
-type InvitationsViewProps = {
-  invitations: Invitation[];
-  isLoading: boolean;
-  refreshInvitations: () => void;
-  setActiveView: (view: string, id?: string) => void;
-  onManageInvitation: (invitationId: string) => void;
-};
+import { Invitation } from '@/lib/types';
 
 const Icon = ({ path, className = "h-5 w-5" }: { path: string; className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

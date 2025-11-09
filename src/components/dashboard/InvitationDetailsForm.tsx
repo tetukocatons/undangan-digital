@@ -4,24 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import LocationPicker from './LocationPicker';
-
-type Invitation = {
-    id: string;
-    bride_name: string;
-    groom_name: string;
-    event_name: string;
-    slug: string;
-    event_date: string;
-    location: string;
-    latitude: number | null;
-    longitude: number | null;
-    status: string;
-};
-
-type InvitationDetailsFormProps = {
-    invitation: Invitation;
-    onUpdate: () => void;
-};
+import { Invitation } from '@/lib/types';
 
 type SlugStatus = 'idle' | 'checking' | 'available' | 'unavailable';
 

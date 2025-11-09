@@ -5,12 +5,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { User, Session, SupabaseClient } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client'; // <- Ganti import
-
-export type UserProfile = {
-  id: string;
-  full_name: string;
-  role: string;
-};
+import { UserProfile } from '@/lib/types';
 
 type AuthContextType = {
   supabase: SupabaseClient; // <- Ekspor klien supabase agar bisa digunakan di komponen lain

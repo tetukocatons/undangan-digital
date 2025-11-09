@@ -3,12 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-
-type Theme = {
-    id: string;
-    name: string;
-    preview_url?: string;
-};
+import { Theme } from '@/lib/types';
 
 type ThemeSelectorProps = {
     invitationId: string;
