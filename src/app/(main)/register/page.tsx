@@ -4,172 +4,93 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@/lib/supabase/client'; // <-- KEMBALIKAN IMPORT INI
 
 export default function RegisterPage() {
-  const [name, setName] = useState('');
-  const [whatsapp, setWhatsapp] = useState('');
+  const supabase = createClient(); // Buat instance client langsung
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [whatsapp, setWhatsapp] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  
-  // State baru untuk error validasi real-time
-  const [validationErrors, setValidationErrors] = useState({
-    name: '',
-    email: '',
-    password: '',
-  });
-
   const router = useRouter();
-  
-  // Fungsi untuk validasi
-  const validate = () => {
-    const errors = { name: '', email: '', password: '' };
-    let isValid = true;
-    
-    if (!name) {
-      errors.name = 'Nama tidak boleh kosong.';
-      isValid = false;
-    }
-    
-    if (!email.includes('@')) {
-      errors.email = 'Format email tidak valid.';
-      isValid = false;
-    }
-    
-    if (password.length < 8) {
-      errors.password = 'Password harus minimal 8 karakter.';
-      isValid = false;
-    }
-    
-    setValidationErrors(errors);
-    return isValid;
-  };
-
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    setMessage('');
-    setError('');
+    setMessage(''); setError(''); setLoading(true);
 
-    // Jalankan validasi sebelum submit
-    if (!validate()) {
-      return;
-    }
-
-    setLoading(true);
     const { data, error: signUpError } = await supabase.auth.signUp({
-      email: email,
-      password: password,
+      email,
+      password,
       options: {
-        data: { full_name: name },
-        // Nomor WhatsApp akan disimpan di metadata, bukan phone
-      }
+        data: {
+          full_name: fullName,
+        },
+      },
     });
 
     if (signUpError) {
       setError(signUpError.message);
-    } else if (data.user) {
-      // Simpan nomor whatsapp di tabel profiles jika perlu
-      setMessage('Pendaftaran berhasil! Mengarahkan ke dashboard...');
-      router.push('/dashboard');
+    } else {
+      if (data.session) {
+        setMessage('Pendaftaran berhasil! Mengarahkan ke dashboard...');
+        router.push('/dashboard');
+      } else {
+        setMessage('Pendaftaran berhasil. Silakan cek email untuk verifikasi akun Anda.');
+      }
     }
     setLoading(false);
   };
 
   return (
     <div className="bg-brand-champagne min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-4">
-        <div className="text-center">
-            <h1 className="font-serif text-4xl font-bold text-brand-green">Arumaja<span className="text-brand-gold">.</span></h1>
+      <div className="bg-white w-full max-w-md rounded-xl shadow-lg p-6">
+        <div className="text-center mb-6">
+          <h1 className="font-serif text-4xl font-bold text-brand-green">
+            Arumaja<span className="text-brand-gold">.</span>
+          </h1>
+          <h2 className="font-serif text-2xl font-bold text-brand-charcoal mt-2">Create Account</h2>
+          <p className="font-sans text-brand-charcoal/80">Daftar untuk mulai membuat undangan Anda.</p>
         </div>
-        <div className="text-center">
-          <h2 className="font-serif text-3xl font-bold text-brand-charcoal">Register</h2>
-          <p className="font-sans text-brand-charcoal/80 mt-1">Buat akun untuk menikmati layanan Arumaja.</p>
-        </div>
-        <form onSubmit={handleRegister} className="space-y-5 bg-white p-8 rounded-xl shadow-lg border border-brand-gold/20">
+
+        <form onSubmit={handleRegister} className="space-y-4">
           <div>
-            <label htmlFor="name" className="block text-sm font-medium text-brand-charcoal mb-1 font-sans">Nama</label>
-            <input 
-              type="text" 
-              id="name" 
-              placeholder="Nama Kamu"
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                if (validationErrors.name) validate();
-              }}
-              required
-              className="w-full p-3 bg-brand-champagne border border-brand-gold rounded-md"
-            />
-            {validationErrors.name && <p className="text-red-500 text-xs mt-1">{validationErrors.name}</p>}
+            <label htmlFor="fullName" className="block text-sm font-medium text-brand-charcoal mb-1">Nama Lengkap</label>
+            <input id="fullName" type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} required
+              className="w-full p-3 bg-brand-champagne border border-brand-gold rounded-md" placeholder="Nama Lengkap Anda" />
           </div>
           <div>
-            <label htmlFor="whatsapp" className="block text-sm font-medium text-brand-charcoal mb-1 font-sans">WhatsApp Aktif</label>
+            <label htmlFor="email" className="block text-sm font-medium text-brand-charcoal mb-1">Email</label>
+            <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required
+              className="w-full p-3 bg-brand-champagne border border-brand-gold rounded-md" placeholder="kamu@mail.com" />
+          </div>
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium text-brand-charcoal mb-1">Password</label>
+            <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required
+              className="w-full p-3 bg-brand-champagne border border-brand-gold rounded-md" placeholder="••••••••" />
+          </div>
+          <div>
+            <label htmlFor="wa" className="block text-sm font-medium text-brand-charcoal mb-1">WhatsApp (opsional)</label>
             <div className="flex">
-              <span className="inline-flex items-center px-3 text-sm bg-white border border-r-0 border-brand-gold rounded-l-md">+62</span>
-              <input 
-                type="tel" 
-                id="whatsapp" 
-                placeholder="81234xxxx"
-                value={whatsapp}
-                onChange={(e) => setWhatsapp(e.target.value)}
-                required
-                className="w-full p-3 bg-brand-champagne border border-brand-gold rounded-r-md"
-              />
+              <span className="inline-flex items-center px-3 bg-white text-brand-green border border-r-0 border-brand-gold rounded-l-md">+62</span>
+              <input id="wa" type="tel" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)}
+                className="w-full p-3 bg-brand-champagne border border-brand-gold rounded-r-md" placeholder="81234xxxx" />
             </div>
           </div>
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-brand-charcoal mb-1 font-sans">E-Mail Aktif</label>
-            <input 
-              type="email" 
-              id="email" 
-              placeholder="nama@email.com"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                if (validationErrors.email) validate();
-              }}
-              required
-              className="w-full p-3 bg-brand-champagne border border-brand-gold rounded-md"
-            />
-            {validationErrors.email && <p className="text-red-500 text-xs mt-1">{validationErrors.email}</p>}
-          </div>
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-brand-charcoal mb-1 font-sans">Password</label>
-            <div className="relative">
-              <input 
-                type={showPassword ? 'text' : 'password'}
-                id="password" 
-                placeholder="Minimal 8 Karakter"
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  if (validationErrors.password) validate();
-                }}
-                required
-                className="w-full p-3 pr-10 bg-brand-champagne border border-brand-gold rounded-md"
-              />
-              <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 flex items-center pr-3">
-                {/* SVG Icon */}
-              </button>
-            </div>
-            {validationErrors.password && <p className="text-red-500 text-xs mt-1">{validationErrors.password}</p>}
-          </div>
-          {message && <p className="text-center text-sm font-medium text-brand-green">{message}</p>}
-          {error && <p className="text-center text-sm font-medium text-red-600">{error}</p>}
-          <div className="pt-2">
-            <button type="submit" disabled={loading} className="w-full flex justify-center items-center gap-2 py-3 font-bold bg-brand-green text-brand-off-white rounded-md disabled:bg-gray-400">
-              {loading ? 'Memproses...' : 'Selanjutnya'} &rarr;
-            </button>
-          </div>
+
+          {error && <p className="text-red-600 text-sm">{error}</p>}
+          {message && <p className="text-green-700 text-sm">{message}</p>}
+
+          <button type="submit" disabled={loading}
+            className="w-full bg-brand-gold text-brand-green font-semibold py-3 rounded-lg hover:opacity-90 disabled:opacity-60">
+            {loading ? 'Mendaftar...' : 'Daftar'}
+          </button>
         </form>
-        <p className="text-center text-sm text-brand-charcoal/80 pt-4">
-            Sudah punya akun?{' '}
-            <Link href="/login" className="font-semibold text-brand-gold hover:underline">Log in disini</Link>
+
+        <p className="text-sm text-center mt-4">
+          Sudah punya akun? <Link href="/login" className="text-brand-green underline">Masuk</Link>
         </p>
       </div>
     </div>

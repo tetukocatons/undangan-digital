@@ -2,65 +2,85 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase } from '@/lib/supabaseClient';
-import { User, Session } from '@supabase/supabase-js';
+import { User, Session, SupabaseClient } from '@supabase/supabase-js';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client'; // <- Ganti import
+import { UserProfile } from '@/lib/types';
 
-// Tipe untuk nilai yang akan disediakan oleh Context
 type AuthContextType = {
+  supabase: SupabaseClient; // <- Ekspor klien supabase agar bisa digunakan di komponen lain
   user: User | null;
   session: Session | null;
+  profile: UserProfile | null;
   isLoading: boolean;
 };
 
-// Buat Context dengan nilai default
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Buat komponen Provider
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const supabase = createClient(); // Buat klien sisi browser
+  const router = useRouter();
+  
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Fungsi untuk mendapatkan sesi saat komponen pertama kali dimuat
-    const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      setUser(session?.user ?? null);
+    const getInitialUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUser(user);
+        const { data: userProfile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        setProfile(userProfile as UserProfile | null);
+      }
       setIsLoading(false);
     };
 
-    getInitialSession();
+    getInitialUser();
 
-    // Listener untuk memantau perubahan status otentikasi (login/logout)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setIsLoading(false);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      
+      // Saat auth state berubah (login/logout), cukup refresh router.
+      // @supabase/ssr akan menangani sinkronisasi cookie secara otomatis.
+      router.refresh();
+
+      // Ambil ulang profil jika user berubah
+      if (event === 'SIGNED_IN' && session?.user) {
+        const fetchProfile = async () => {
+          const { data: userProfile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+          setProfile(userProfile as UserProfile | null);
+        };
+        fetchProfile();
+      } else if (event === 'SIGNED_OUT') {
+        setProfile(null);
       }
-    );
+    });
 
-    // Cleanup listener saat komponen di-unmount
     return () => {
-      subscription?.unsubscribe();
+      subscription.unsubscribe();
     };
-  }, []);
+  }, [supabase, router]);
 
-  const value = {
-    user,
-    session,
-    isLoading,
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ supabase, user, session, profile, isLoading }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
-// Buat custom hook untuk menggunakan AuthContext dengan mudah
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
 }

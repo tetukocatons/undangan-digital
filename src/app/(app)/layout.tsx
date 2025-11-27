@@ -6,5 +6,8 @@ export default function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // Dengan membungkus grup (app) dengan AuthProvider,
+  // state otentikasi hanya aktif di area dashboard dan terisolasi
+  // dari halaman publik.
   return <AuthProvider>{children}</AuthProvider>;
 }

@@ -1,84 +1,122 @@
+// src/components/dashboard/Sidebar.tsx
 'use client';
 
-import Link from 'next/link';
-import { User } from '@supabase/supabase-js';
-
-// --- Type Definitions ---
-type MenuItem = {
-  id: string;
-  name: string;
-  icon: JSX.Element;
-};
+import { UserProfile, Invitation } from '@/lib/types';
 
 type SidebarProps = {
   activeView: string;
-  setActiveView: (view: string) => void;
+  // Perbarui tipe untuk menerima fungsi async
+  setActiveView: (view: string) => Promise<void> | void; 
   onLogout: () => void;
+  profile: UserProfile | null;
+  isOpen: boolean;
+  toggle: () => void;
+  invitations: Invitation[];
 };
 
-// --- SVG Icons ---
-const Icon = ({ path }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d={path} />
-  </svg>
-);
-
-const icons = {
-  dashboard: <Icon path="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />,
-  invitations: <Icon path="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />,
-  invoice: <Icon path="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />,
-  tutorial: <Icon path="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />,
-  profile: <Icon path="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />,
-  logout: <Icon path="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />,
-};
-
-// --- Menu Definitions ---
-export const mainMenu: MenuItem[] = [
-    { id: 'dashboard', name: 'Dashboard', icon: icons.dashboard },
-    { id: 'invitations', name: 'Undangan Saya', icon: icons.invitations },
-    { id: 'invoice', name: 'Invoice', icon: icons.invoice },
-    { id: 'tutorial', name: 'Tutorial', icon: icons.tutorial },
-];
-export const accountMenu: MenuItem[] = [
-    { id: 'profile', name: 'Edit Profil', icon: icons.profile },
+const menu = [
+  { id: 'dashboard', name: 'Dashboard', requiresPaid: false },
+  { id: 'manage-invitation', name: 'Undangan', requiresPaid: true },
+  { id: 'guest-management', name: 'Tamu & RSVP', requiresPaid: true },
+  { id: 'settings', name: 'Pengaturan', requiresPaid: false },
+  { id: 'help', name: 'Bantuan', requiresPaid: false },
+  { id: 'account', name: 'Akun Saya', requiresPaid: false },
 ];
 
-export default function Sidebar({ activeView, setActiveView, onLogout }: SidebarProps) {
-    return (
-        <aside className="bg-brand-green text-brand-off-white w-64 min-h-screen flex-col hidden md:flex">
-            <div className="p-6 text-center border-b border-brand-off-white/10">
-                <Link href="/">
-                    <h1 className="font-serif text-3xl font-bold text-brand-off-white">
-                        Arumaja<span className="text-brand-gold">.</span>
-                    </h1>
-                </Link>
-            </div>
-            <nav className="flex-grow p-4 space-y-6">
-                <div>
-                    <h3 className="px-4 text-xs font-semibold uppercase text-brand-off-white/50 mb-2">Main Menu</h3>
-                    {mainMenu.map(item => (
-                        <button key={item.id} onClick={() => setActiveView(item.id)}
-                            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-md transition-colors duration-300 ${activeView === item.id ? 'text-brand-gold bg-brand-off-white/10' : 'hover:text-brand-gold'}`}>
-                            {item.icon}
-                            <span className="font-semibold">{item.name}</span>
-                        </button>
-                    ))}
-                </div>
-                <div>
-                    <h3 className="px-4 text-xs font-semibold uppercase text-brand-off-white/50 mb-2">Account</h3>
-                    {accountMenu.map(item => (
-                        <button key={item.id} onClick={() => setActiveView(item.id)}
-                            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-md transition-colors duration-300 ${activeView === item.id ? 'text-brand-gold bg-brand-off-white/10' : 'hover:text-brand-gold'}`}>
-                            {item.icon}
-                            <span className="font-semibold">{item.name}</span>
-                        </button>
-                    ))}
-                    <button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-md transition-colors duration-300 hover:text-red-400">
-                        {icons.logout}
-                        <span className="font-semibold">Log Out</span>
+const adminMenu = [
+    { id: 'user-management', name: 'Manajemen User', roles: ['administrator'] },
+    { id: 'theme-management', name: 'Manajemen Tema', roles: ['administrator', 'staff'] },
+];
+
+export default function Sidebar({ activeView, setActiveView, onLogout, profile, isOpen, toggle, invitations }: SidebarProps) {
+  
+  const hasPaidInvitation = invitations.some(inv => inv.status === 'paid');
+
+  const handleItemClick = (view: string, requiresPaid: boolean) => {
+    if (requiresPaid && !hasPaidInvitation) {
+      alert('Harap selesaikan pembuatan dan pembayaran undangan Anda terlebih dahulu untuk mengakses menu ini.');
+      return;
+    }
+
+    setActiveView(view);
+    if (isOpen) {
+      toggle();
+    }
+  };
+
+  const sidebarContent = (
+    <div className="flex flex-col h-full">
+      <h2 className="font-serif text-2xl font-bold mb-6">
+        Arumaja<span className="text-brand-gold">.</span>
+      </h2>
+      <nav className="space-y-2 flex-grow">
+        {menu.map(item => {
+          const isDisabled = item.requiresPaid && !hasPaidInvitation;
+          return (
+            <button
+              key={item.id}
+              onClick={() => handleItemClick(item.id, item.requiresPaid)}
+              disabled={isDisabled}
+              className={
+                'w-full text-left px-4 py-2 rounded-lg transition-colors ' +
+                (activeView === item.id ? 'bg-brand-off-white/10 text-brand-gold font-semibold' : 'hover:text-brand-gold ') +
+                (isDisabled ? 'opacity-50 cursor-not-allowed' : '')
+              }
+              title={isDisabled ? 'Selesaikan pembuatan undangan terlebih dahulu' : ''}
+            >
+              • {item.name}
+            </button>
+          );
+        })}
+        
+        {profile && (profile.role === 'administrator' || profile.role === 'staff') && (
+        <div className="mt-4 pt-4 border-t border-white/10">
+            <p className="px-4 pb-2 text-sm font-semibold text-brand-off-white/50 uppercase tracking-wider">Admin Panel</p>
+            {adminMenu.map(item => (
+                item.roles.includes(profile.role) && (
+                    <button
+                        key={item.id}
+                        onClick={() => handleItemClick(item.id, false)}
+                        className={
+                          'w-full text-left px-4 py-2 rounded-lg transition-colors ' +
+                          (activeView === item.id ? 'bg-brand-off-white/10 text-brand-gold font-semibold' : 'hover:text-brand-gold')
+                        }
+                    >
+                        • {item.name}
                     </button>
-                </div>
-            </nav>
-        </aside>
-    );
+                )
+            ))}
+        </div>
+        )}
+      </nav>
+
+      <div className="mt-6 border-t border-white/10 pt-4">
+        <button
+          type="button"
+          onClick={onLogout}
+          className="w-full text-left px-4 py-2 rounded-lg hover:text-brand-gold transition-colors">
+          Keluar
+        </button>
+      </div>
+    </div>
+  );
+  
+  return (
+    <>
+      <aside className="w-64 bg-brand-green text-brand-off-white min-h-screen p-4 hidden md:flex flex-col">
+        {sidebarContent}
+      </aside>
+
+      <div 
+        className={`fixed inset-0 z-40 bg-black/50 transition-opacity md:hidden ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        onClick={toggle}
+      ></div>
+
+      <aside 
+        className={`fixed top-0 left-0 z-50 w-64 h-full bg-brand-green text-brand-off-white p-4 transform transition-transform md:hidden ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
+      >
+        {sidebarContent}
+      </aside>
+    </>
+  );
 }
